@@ -1,0 +1,224 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Playfair+Display:wght@500;600;700;800&display=swap');
+ 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+@layer base {
+  :root {
+    /* Albarka Trade - Professional African Business Palette */
+    --background: 30 20% 8%;
+    --foreground: 40 30% 95%;
+
+    --card: 30 20% 12%;
+    --card-foreground: 40 30% 95%;
+
+    --popover: 30 20% 12%;
+    --popover-foreground: 40 30% 95%;
+
+    /* Gold/Orange Primary - Warm sunset tones */
+    --primary: 38 95% 50%;
+    --primary-foreground: 30 20% 8%;
+
+    /* Emerald Green Secondary */
+    --secondary: 152 60% 35%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Warm muted tones */
+    --muted: 30 15% 18%;
+    --muted-foreground: 35 20% 60%;
+
+    /* Gold accent */
+    --accent: 45 90% 55%;
+    --accent-foreground: 30 20% 8%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 15% 22%;
+    --input: 30 15% 18%;
+    --ring: 38 95% 50%;
+
+    --radius: 0.5rem;
+
+    /* Custom Albarka colors */
+    --gold: 38 95% 50%;
+    --gold-light: 42 90% 60%;
+    --gold-dark: 35 95% 40%;
+    
+    --emerald: 152 60% 35%;
+    --emerald-light: 152 50% 45%;
+    --emerald-dark: 152 65% 25%;
+    
+    --warm-dark: 30 20% 8%;
+    --warm-brown: 25 25% 15%;
+    --cream: 40 30% 90%;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(38 95% 50%) 0%, hsl(45 90% 55%) 100%);
+    --gradient-sunset: linear-gradient(180deg, hsl(25 60% 30% / 0.8) 0%, hsl(30 20% 8%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(30 20% 8%) 0%, hsl(30 20% 12%) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 2px 8px -2px hsl(30 20% 0% / 0.3);
+    --shadow-md: 0 8px 24px -8px hsl(30 20% 0% / 0.4);
+    --shadow-lg: 0 16px 40px -12px hsl(30 20% 0% / 0.5);
+    --shadow-gold: 0 8px 24px -8px hsl(38 95% 50% / 0.3);
+    --shadow-emerald: 0 8px 24px -8px hsl(152 60% 35% / 0.3);
+
+    --sidebar-background: 30 20% 8%;
+    --sidebar-foreground: 40 30% 95%;
+    --sidebar-primary: 38 95% 50%;
+    --sidebar-primary-foreground: 30 20% 8%;
+    --sidebar-accent: 30 15% 18%;
+    --sidebar-accent-foreground: 40 30% 95%;
+    --sidebar-border: 30 15% 22%;
+    --sidebar-ring: 38 95% 50%;
+  }
+
+  .dark {
+    /* Same as default - dark theme by default */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  /* Gold Glow Buttons */
+  .btn-primary-glow {
+    @apply bg-primary text-primary-foreground font-semibold;
+    box-shadow: var(--shadow-gold);
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -8px hsl(38 95% 50% / 0.5);
+  }
+
+  .btn-secondary-glow {
+    @apply bg-secondary text-secondary-foreground font-semibold;
+    box-shadow: var(--shadow-emerald);
+    transition: all 0.3s ease;
+  }
+
+  .btn-secondary-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -8px hsl(152 60% 35% / 0.5);
+  }
+
+  /* Card Hover Effects */
+  .card-hover {
+    transition: all 0.4s ease;
+  }
+
+  .card-hover:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Section Padding */
+  .section-padding {
+    @apply py-16 md:py-24 px-4 md:px-8;
+  }
+
+  /* Hero Overlay */
+  .hero-overlay {
+    background: linear-gradient(
+      to right,
+      hsl(30 20% 8% / 0.95) 0%,
+      hsl(30 20% 8% / 0.7) 50%,
+      hsl(30 20% 8% / 0.3) 100%
+    );
+  }
+
+  /* Gold Underline */
+  .gold-underline {
+    position: relative;
+    display: inline-block;
+  }
+
+  .gold-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 60px;
+    height: 3px;
+    background: var(--gradient-hero);
+    border-radius: 2px;
+  }
+
+  /* Section Divider */
+  .section-divider {
+    height: 3px;
+    width: 80px;
+    background: var(--gradient-hero);
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out forwards;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-slide-right {
+    animation: slideRight 0.6s ease-out forwards;
+  }
+
+  @keyframes slideRight {
+    from { opacity: 0; transform: translateX(-30px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+}
