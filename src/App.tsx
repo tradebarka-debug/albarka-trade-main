@@ -30,7 +30,23 @@ import Suppliers from "./pages/Suppliers";
 import SupplierDetails from "./pages/SupplierDetails";
 import NotFound from "./pages/NotFound";
 import RestaurantPage from "./pages/RestaurantPage";
-
+import CountryDetector from "./components/CountryDetector";
+import CountrySelector from "./components/CountrySelector";
+import Representant from "./pages/Representant";
+import RepresentantHome from "./pages/RepresentantHome";
+import ConnexionRepresentant from "./pages/ConnexionRepresentant";
+import DashboardRepresentant from "./pages/DashboardRepresentant";
+import ProfilRepresentant from "./pages/ProfilRepresentant";
+import RepresentantForm from "./components/representant/RepresentantForm";
+import PackRepresentant from "@/pages/PackRepresentant";
+import CommissionsRepresentant from "@/pages/CommissionsRepresentant";
+import PerformancesRepresentant from "@/pages/PerformancesRepresentant";
+import FilleulsRepresentant from "@/pages/FilleulsRepresentant";
+import LienParrainageRepresentant from "@/pages/LienParrainageRepresentant";
+import QRCodeRepresentant from "@/pages/QRCodeRepresentant";
+import AcheterPackRepresentant from "@/pages/AcheterPackRepresentant";
+import AssistanceRepresentant from "@/pages/AssistanceRepresentant";
+import FAQRepresentant from "@/pages/FAQRepresentant";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -50,6 +66,8 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <CountryDetector />
+      <CountrySelector />
       <AuthProvider>
         <CartProvider>
           <Toaster />
@@ -76,6 +94,60 @@ const App = () => (
                 <Route path="admin-partners" element={<AdminPartners />} />
               </Route>
 
+              <Route
+                path="/dashboard-representant"
+                element={<DashboardRepresentant />}
+              />
+
+              <Route
+                path="/profil-representant"
+                element={<ProfilRepresentant />}
+              />
+
+              <Route
+                path="/pack-representant"
+                element={<PackRepresentant />}
+              />
+
+              <Route
+                path="/commissions-representant"
+                element={<CommissionsRepresentant />}
+              />
+
+              <Route
+                path="/performances-representant"
+                element={<PerformancesRepresentant />}
+              />
+
+              <Route
+                path="/filleuls-representant"
+                element={<FilleulsRepresentant />}
+              />
+
+              <Route
+                path="/lien-parrainage"
+                element={<LienParrainageRepresentant />}
+              />
+
+              <Route
+                path="/qrcode-representant"
+                element={<QRCodeRepresentant />}
+              />
+
+              <Route
+                path="/acheter-pack"
+                element={<AcheterPackRepresentant />}
+              />
+
+              <Route
+                path="/assistance-representant"
+                element={<AssistanceRepresentant />}
+              />
+
+              <Route
+                path="/faq-representant"
+                element={<FAQRepresentant />}
+              />
               {/* Public routes - with Header/Footer */}
               <Route
                 path="*"
@@ -100,6 +172,10 @@ const App = () => (
                         <Route path="/restaurant/:slug" element={<RestaurantPage />} />
                         <Route path="/suppliers" element={<Suppliers />} />
                         <Route path="/suppliers/:id" element={<SupplierDetails />} />
+                        <Route path="/representant-home" element={<RepresentantHome />} />
+                        <Route path="/devenir-representant" element={<Representant />} />
+                        <Route path="/connexion-representant" element={<ConnexionRepresentant />} />
+                        <Route path="/inscription-representant" element={<RepresentantForm />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </div>

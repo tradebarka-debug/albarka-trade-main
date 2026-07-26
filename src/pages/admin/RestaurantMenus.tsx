@@ -8,17 +8,19 @@ const RestaurantMenus = () => {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState(1);
 
   useEffect(() => {
     fetchRestaurants();
-  }, []);
+  }, [selectedCountry]);
 
   const fetchRestaurants = async () => {
     const { data } = await supabase
-      .from("restaurant_partners" as any)
-      .select("*");
+  .from("restaurant_partners" as any)
+  .select("*")
+  .eq("country_id", selectedCountry);
 
-    setRestaurants(data || []);
+setRestaurants(data || []);
   };
 
   const handleAddMenu = async () => {
@@ -26,7 +28,10 @@ const RestaurantMenus = () => {
       .from("restaurant_menu_items" as any)
       .insert([
         {
+
           restaurant_id: restaurantId,
+          country_id: selectedCountry,
+          country: selectedCountry === 1 ? "Burkina Faso" : "Côte d'Ivoire",
           name,
           description,
           price: Number(price),
@@ -55,7 +60,14 @@ const RestaurantMenus = () => {
       <h1 className="text-3xl font-bold text-white">
         Ajouter un menu
       </h1>
-
+      <select
+        value={selectedCountry}
+        onChange={(e) => setSelectedCountry(Number(e.target.value))}
+        className="w-full p-3 rounded text-black"
+      >
+        <option value={1}>🇧🇫 Burkina Faso</option>
+        <option value={2}>🇨🇮 Côte d'Ivoire</option>
+      </select>
       <select
         value={restaurantId}
         onChange={(e) => setRestaurantId(e.target.value)}
@@ -106,6 +118,7 @@ const RestaurantMenus = () => {
         className="bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold"
       >
         Ajouter le menu
+
       </button>
     </div>
   );

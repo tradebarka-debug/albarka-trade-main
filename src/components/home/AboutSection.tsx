@@ -1,5 +1,7 @@
 import { Globe, Truck, Users } from "lucide-react";
 
+const isBurkina = Number(localStorage.getItem("country_id") || "1") === 1;
+const countryName = isBurkina ? "Burkina Faso" : "Côte d'Ivoire";
 const AboutSection = () => {
   return (
     <section className="section-padding bg-card">
@@ -10,24 +12,35 @@ const AboutSection = () => {
             <span className="text-primary font-semibold text-sm uppercase tracking-wider">
               À Propos de Albarka Trade
             </span>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mt-3 mb-6">
+            <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-foreground mt-3 mb-6">
               QUI SOMMES-<span className="text-primary">NOUS</span> ?
             </h2>
             <div className="section-divider mb-6" />
             <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-              <span className="text-primary font-semibold">Albarka Trade International</span> est un hub de distribution, de services et de recrutement qui connecte entreprises, producteurs et professionnels à des opportunités réelles au Burkina Faso et dans la sous-région.
+              <span className="text-primary font-semibold">Albarka Trade International</span>{" "}
+              est un hub de distribution, de services et de recrutement qui connecte entreprises,
+              producteurs et professionnels à des opportunités réelles{" "}
+              {isBurkina
+                ? "au Burkina Faso et dans la sous-région."
+                : "en Côte d'Ivoire et en Afrique de l'Ouest."}
             </p>
             <p className="text-muted-foreground leading-relaxed mb-8">
-              Vous voulez vendre plus et dominer votre marché? Lancez votre produit rapidement, developez vos ventes, creez un réseau commercial puissant.
+              {isBurkina
+                ? "Vous voulez vendre plus et dominer votre marché au Burkina Faso ? Lancez votre produit rapidement, développez vos ventes et créez un réseau commercial puissant."
+                : "Vous voulez développer votre activité en Côte d'Ivoire ? Lancez votre produit rapidement, développez vos ventes et créez un réseau commercial puissant."
+              }
             </p>
             <p className="text-base md:text-lg lg:text-xl font-semibold mb-10 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-              Une plateforme unique pour distribuer, vendre et recruter  efficacement.
+              {isBurkina
+                ? "Une plateforme unique pour distribuer, vendre et recruter efficacement au Burkina Faso."
+                : "Une plateforme unique pour distribuer, vendre et recruter efficacement en Côte d'Ivoire."
+              }
             </p>
             <button
-              onClick={() => window.location.href = "/recrutement"}
-              className="mt-4 mb-12 px-6 py-3 bg-primary text-black font-semibold rounded-lg hover:opacity-90 hover:scale-105 transition"
+              onClick={() => window.location.href = "/Devenir-representant"}
+              className="mt-10 mb-12 px-8 py-4 bg-primary text-black text-1.9xl font-bold rounded-xl shadow-lg hover:scale-105 transition duration-300 flex items-center gap-3"
             >
-              Rejoindre notre réseau
+              🚀 Devenir Représentant Officiel Albarka
             </button>
 
             {/* Features */}
@@ -59,15 +72,15 @@ const AboutSection = () => {
           {/* Right Content - Stats */}
           <div className="grid grid-cols-2 gap-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
             <div className="bg-background rounded-2xl p-8 text-center card-hover border border-border">
-              <p className="text-4xl md:text-5xl font-bold text-primary mb-2">10+</p>
+              <p className="text-4xl md:text-5xl font-bold text-primary mb-2">{isBurkina ? "10+" : "15+"}</p>
               <p className="text-muted-foreground">Années d'expérience</p>
             </div>
             <div className="bg-background rounded-2xl p-8 text-center card-hover border border-border">
-              <p className="text-4xl md:text-5xl font-bold text-secondary mb-2">1000+</p>
+              <p className="text-4xl md:text-5xl font-bold text-secondary mb-2">{isBurkina ? "500+" : "1000+"}</p>
               <p className="text-muted-foreground">Clients satisfaits</p>
             </div>
             <div className="bg-background rounded-2xl p-8 text-center card-hover border border-border">
-              <p className="text-4xl md:text-5xl font-bold text-accent mb-2">+3</p>
+              <p className="text-4xl md:text-5xl font-bold text-accent mb-2">{isBurkina ? "+3" : "1"}</p>
               <p className="text-muted-foreground">Pays desservis</p>
             </div>
             <div className="bg-background rounded-2xl p-8 text-center card-hover border border-border">

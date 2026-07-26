@@ -1,6 +1,7 @@
 import mainOeuvreClair from "../../assets/main-oeuvre.png";
 import { Link } from "react-router-dom";
 import { Users, ShieldCheck, Clock } from "lucide-react";
+import { isBurkina, isCoteIvoire } from "@/data/country";
 
 const MainOeuvreSection = () => {
   return (

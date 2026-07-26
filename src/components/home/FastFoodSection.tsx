@@ -5,7 +5,8 @@ import logoHalal from "@/assets/logo-halal.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { isBurkina, isCoteIvoire } from "@/data/country";
+const selectedCountry = Number(localStorage.getItem("country_id")) || 1;
 
 const restaurantsData = [
   {
@@ -82,30 +83,36 @@ const restaurantsData = [
 
 const FastFoodSection = () => {
   const navigate = useNavigate();
+  const [selectedCountry, setSelectedCountry] = useState(
+  Number(localStorage.getItem("country_id")) || 1
+);
   const [restaurants, setRestaurants] = useState(restaurantsData);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollLeft=()=>{
-    if (scrollRef.current) { scrollRef.current.scrollBy({left: -400,
-      behavior:"smooth",
+  const scrollLeft = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({
+        left: -400,
+        behavior: "smooth",
       });
-      }
-      };
-      const scrollRight = ()=> {
-        if (scrollRef.current) {
-          scrollRef.current.scrollBy({
-          left:400,
-          behavior:"smooth",
-          });
-          }
-          };
+    }
+  };
+  const scrollRight = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({
+        left: 400,
+        behavior: "smooth",
+      });
+    }
+  };
   useEffect(() => {
     const fetchRestaurants = async () => {
       setLoading(true);
 
       const { data, error } = await supabase
         .from("restaurant_partners" as any)
-        .select("*");
+        .select("*")
+        .eq("country_id", selectedCountry);
 
       if (!error && data) {
         setRestaurants(data as any);
@@ -115,7 +122,7 @@ const FastFoodSection = () => {
     };
 
     fetchRestaurants();
-  }, []);
+  }, [selectedCountry]);
   useEffect(() => {
     const container = scrollRef.current;
 
@@ -140,6 +147,20 @@ const FastFoodSection = () => {
   }
 
   return (
+  <>
+    <select
+      value={selectedCountry}
+      onChange={(e) => {
+  const value = Number(e.target.value);
+  setSelectedCountry(value);
+  localStorage.setItem("country_id", value.toString());
+}}
+      className="w-full p-3 rounded text-black mb-4"
+    >
+      <option value={1}>🇧🇫 Burkina Faso</option>
+      <option value={2}>🇨🇮 Côte d'Ivoire</option>
+    </select>
+
     <section className="section-padding bg-background">
       <div className="container mx-auto">
         {/* Section Header */}
@@ -156,19 +177,19 @@ const FastFoodSection = () => {
           </p>
         </div>
         <div className="hidden md:flex justify-between items-center px-8 mb-2">
-        <button
-        onClick={scrollLeft}
-        className="bg-yellow-500 text-black w-12 h-12 rounded-full font-bold text-xl"
-        >
-            ← 
-        </button>
+          <button
+            onClick={scrollLeft}
+            className="bg-yellow-500 text-black w-12 h-12 rounded-full font-bold text-xl"
+          >
+            ←
+          </button>
 
-        <button
-        onClick={scrollRight}
-        className="bg-yellow-500 text-black w-12 h-12 rounded-full font-bold text-xl"
-        >
-           →
-       </button>
+          <button
+            onClick={scrollRight}
+            className="bg-yellow-500 text-black w-12 h-12 rounded-full font-bold text-xl"
+          >
+            →
+          </button>
         </div>
         <div ref={scrollRef}
           className="flex gap-4 overflow-x-auto pb-10"
@@ -208,7 +229,8 @@ const FastFoodSection = () => {
           ))}
         </div>
       </div>
-    </section >
+    </section>
+  </>
   );
 };
 

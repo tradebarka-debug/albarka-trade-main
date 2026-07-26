@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Truck, Globe, HeadphonesIcon } from "lucide-react";
+import { isBurkina, isCoteIvoire } from "@/data/country";
+const countryName = isBurkina ? "Burkina Faso" : "Côte d'Ivoire";
 
 const services = [
   {
     icon: Truck,
     title: "Logistique",
-    description: "Transport et distribution de marchandises à travers le Burkina Faso et la sous-région",
+    description: "Transport et distribution de marchandises à travers le " + countryName + " et la sous-région",
     color: "primary",
   },
   {
@@ -42,7 +44,7 @@ const ServicesSection = () => {
         </div>
 
         {/* Services Grid */}
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {services.map((service, index) => (
             <div
               key={service.title}

@@ -1,7 +1,8 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/contexts/CartContext";
+
 
 const restaurants = {
     delice: {
@@ -127,9 +128,13 @@ const restaurants = {
 
 const RestaurantPage = () => {
     const { slug } = useParams();
+    const navigate = useNavigate();
     const [menuItems, setMenuItems] = useState([]);
     const [cart, setCart] = useState<any[]>([]);
     const [restaurant_partners, setrestaurant_partners] = useState([]);
+    const [selectedCountry, setSelectedCountry] = useState(
+  Number(localStorage.getItem("country_id")) || 1
+);
 
     const restaurant = restaurant_partners.find((item: any) => item.slug === slug
     );
@@ -137,33 +142,34 @@ const RestaurantPage = () => {
 
     const fetchRestaurant = async () => {
 
-  const { data }: any = await supabase
-    .from("restaurant_partners" as any)
-    .select("*");
+        const { data }: any = await supabase
+            .from("restaurant_partners")
+            .select("*")
+            .eq("country_id", selectedCountry);
+        setrestaurant_partners(data || []);
 
-  setrestaurant_partners(data || []);
+        const currentRestaurant = data?.find(
+            (item: any) => item.slug === slug
+        );
 
-  const currentRestaurant = data?.find(
-    (item: any) => item.slug === slug
-  );
+        if (!currentRestaurant) return;
 
-  if (!currentRestaurant) return;
+        const { data: menuData } = await supabase
+            .from("restaurant_menu_items")
+            .select("*")
+            .eq("restaurant_id", currentRestaurant.id)
+            .eq("country_id", currentRestaurant.country_id);
 
-  const { data: menuData } = await supabase
-    .from("restaurant_menu_items" as any)
-    .select("*")
-    .eq("restaurant_id", currentRestaurant.id);
-
-  setMenuItems(menuData || []);
-};
+        setMenuItems(menuData || []);
+    };
     useEffect(() => {
         fetchRestaurant();
-    }, []);
+    }, [selectedCountry]);
     const { addItem } = useCart();
 
-const addToCart = (item: any) => {
-  addItem(item);
-};
+    const addToCart = (item: any) => {
+        addItem(item);
+    };
     if (!restaurant) {
         return (
             <div className="text-white p-10">
@@ -172,59 +178,90 @@ const addToCart = (item: any) => {
         );
     }
     return (
-        <div className="min-h-screen bg-black text-white p-6">
-            <div className="max-w-6xl mx-auto">
+        <>
+            <select
 
-                <img
-                    src={restaurant.image_url}
-                    alt={restaurant.name}
-                    className="w-full h-[400px] object-cover rounded-2xl"
-                />
+                value={selectedCountry}
+                onChange={(e) => {
+  const value = Number(e.target.value);
+  setSelectedCountry(value);
+  localStorage.setItem("country_id", value.toString());
+}}
+                className="w-full p-3 rounded text-black mb-4"
+            >
+                <option value={1}>🇧🇫 Burkina Faso</option>
+                <option value={2}>🇨🇮 Côte d'Ivoire</option>
+            </select>
 
-                <div className="mt-6">
-                    <h1 className="text-5xl font-bold">
-                        {restaurant.name}
-                    </h1>
+            <div className="min-h-screen bg-black text-white p-6">
+                <div className="max-w-6xl mx-auto">
 
-                    <p className="text-yellow-400 text-2xl mt-3">
-                        {restaurant.phone}
-                    </p>
-                </div>
+                    <img
+                        src={restaurant.image_url}
+                        alt={restaurant.name}
+                        className="w-full h-[400px] object-cover rounded-2xl"
+                    />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-                    {menuItems.map((item: any, index: number) => (
-                        <div
-                            key={index}
-                            className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800"
-                        >
-                            <img
-                                src={item.image_url}
-                                alt={item.name}
-                                className="w-full h-48 object-cover rounded-xl mb-4"
-                            />
-                            <h2 className="text-2xl font-semibold">
-                                {item.name}
-                            </h2>
-                            <p className="text-gray-300 mt-2">
-                                {item.description}
-                            </p>
-                            <p className="text-yellow-400 text-xl mt-3">
-                                {item.price} FCFA
-                            </p>
+                    <div className="mt-6">
+                        <h1 className="text-5xl font-bold">
+                            {restaurant.name}
+                        </h1>
 
-                            <button
-                                onClick={() => addToCart(item)}
-                                className="mt-5 w-full bg-yellow-400 text-black py-3 rounded-xl font-bold hover:bg-yellow-300"
+                        <p className="text-yellow-400 text-2xl mt-3">
+                            {restaurant.phone}
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+                        {menuItems.map((item: any, index: number) => (
+                            <div
+                                key={index}
+                                className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800"
                             >
-                                Commander maintenant
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                                <img
+                                    src={item.image_url}
+                                    alt={item.name}
+                                    className="w-full h-48 object-cover rounded-xl mb-4"
+                                />
+                                <h2 className="text-2xl font-semibold">
+                                    {item.name}
+                                </h2>
+                                <p className="text-gray-300 mt-2">
+                                    {item.description}
+                                </p>
+                                <p className="text-yellow-400 text-xl mt-3">
+                                    {item.price} FCFA
+                                </p>
 
-            </div>
-        </div>
+                                <div className="mt-5 flex gap-2">
+                                    <a
+                                        href="https://wa.me/22602301515"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold text-center"
+                                    >
+                                        WhatsApp
+                                    </a>
+
+                                    <button
+                                        onClick={() => {
+                                            addToCart(item);
+                                            navigate("/panier");
+                                        }}
+                                        className="flex-1 bg-yellow-400 text-black py-3 rounded-xl font-bold"
+                                    >
+                                        Commander
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                </div>
+            </div >
+        </>
     );
+
 };
 
 export default RestaurantPage;

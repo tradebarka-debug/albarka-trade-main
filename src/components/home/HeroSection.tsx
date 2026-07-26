@@ -7,8 +7,10 @@ import heroRizNafiMobile from "@/assets/hero-riz-nafi-mobile.jpeg";
 import heroSodisGaz from "@/assets/hero-sodis-gaz.jpeg";
 import heroPizza from "@/assets/pizza-albarka.jpeg";
 import mainOeuvreClair from "@/assets/main-oeuvre.png";
+import { isBurkina, isCoteIvoire } from "@/data/country";
+const countryId = Number(localStorage.getItem("country_id") || "1");
 
-const slides: Array<{
+const burkinaSlides: Array<{
   image: string;
   mobileImage?: string;
   title: string;
@@ -74,13 +76,256 @@ const slides: Array<{
   objectFit: "contain",
   bgColor: "bg-gradient-to-br from-black via-black/90 to-transparent",
   kenBurns: "scale(1.03) translate(0%, 0%)"
-}
+},
+{
+  image: heroRizNafiNew,
+  mobileImage: heroRizNafiMobile,
+  title: "RIZ NAFI",
+  subtitle: "100% BRISURES PARFUMÉES",
+  tagline: "Qualité supérieure, prix réduit !",
+  objectPosition: {
+    desktop: "center 20%",
+    mobile: "center center"
+  },
+  objectFit: "cover",
+  bgColor: "bg-gradient-to-br from-blue-900 to-blue-950",
+  hideText: true,
+  kenBurns: "scale(1.15) translate(-2%, 1%)"
+},
+{
+  image: heroSodisGaz,
+  title: "SODIS GAZ",
+  subtitle: "",
+  tagline: "Sécurité et fiabilité garanties !",
+  objectPosition: {
+    desktop: "center center",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-blue-900 to-blue-950",
+  kenBurns: "scale(1.1) translate(2%, -1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Ouagadougou 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: mainOeuvreClair,
+  mobileImage: mainOeuvreClair,
+  title: "MAIN D’ŒUVRE",
+  subtitle: "Professionnels qualifiés",
+  tagline: "Recrutement rapide et demande de service 24h/24",
+  objectPosition: {
+    desktop: "center center",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-black via-black/90 to-transparent",
+  kenBurns: "scale(1.03) translate(0%, 0%)"
+},
+{
+ image: heroRizNafiNew,
+  mobileImage: heroRizNafiMobile,
+  title: "RIZ NAFI",
+  subtitle: "100% BRISURES PARFUMÉES",
+  tagline: "Qualité supérieure, prix réduit !",
+  objectPosition: {
+    desktop: "center 20%",
+    mobile: "center center"
+  },
+  objectFit: "cover",
+  bgColor: "bg-gradient-to-br from-blue-900 to-blue-950",
+  hideText: true,
+  kenBurns: "scale(1.15) translate(-2%, 1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+
 ];
 
-const SLIDE_DURATION = 6000;
-const FADE_DURATION = 1200;
+const coteIvoireSlides: Array<{
+  image: string;
+  mobileImage?: string;
+  title: string;
+  subtitle: string;
+  tagline: string;
+  objectPosition: { desktop: string; mobile: string };
+  objectFit: "cover" | "contain";
+  bgColor: string;
+  hideText?: boolean;
+  kenBurns: string;
+}> = [{
+  image: heroPizza,
+  mobileImage:heroPizza,
+  title:  "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center center",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-green-900 to-blue-950",
+  hideText: true,
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: heroSodisGaz,
+  title: "SODIS GAZ",
+  subtitle: "",
+  tagline: "Sécurité et fiabilité garanties !",
+  objectPosition: {
+    desktop: "center center",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-blue-900 to-blue-950",
+  kenBurns: "scale(1.1) translate(2%, -1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: mainOeuvreClair,
+  mobileImage: mainOeuvreClair,
+  title: "MAIN D’ŒUVRE",
+  subtitle: "Professionnels qualifiés",
+  tagline: "Recrutement rapide et demande de service 24h/24",
+  objectPosition: {
+    desktop: "center center",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-black via-black/90 to-transparent",
+  kenBurns: "scale(1.03) translate(0%, 0%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+{
+  image: heroPizza,
+  mobileImage: heroPizza,
+  title: "PIZZA ALBARKA",
+  subtitle: "100% HALAL",
+  tagline: "La pizza qui fait fondre Abidjan 🔥 ",
+  objectPosition: {
+    desktop: "center 30%",
+    mobile: "center center"
+  },
+  objectFit: "contain",
+  bgColor: "bg-gradient-to-br from-orange-900 to-red-900",
+  kenBurns: "scale(1.02) translate(2%, -1%)"
+},
+];
+
+const SLIDE_DURATION = 1800;
+const FADE_DURATION = 500;
 
 const HeroSection = () => {
+  const countryId = Number(localStorage.getItem("country_id")) || 1;
+
+const slides =
+  countryId === 2 ? coteIvoireSlides : burkinaSlides;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [nextIndex, setNextIndex] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -260,7 +505,7 @@ const HeroSection = () => {
 
       {/* Dots Indicator */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-3">
-        {slides.map((_, index) => (
+        {burkinaSlides.map((_, index) => (
           <button
             key={index}
             onClick={() => scrollTo(index)}

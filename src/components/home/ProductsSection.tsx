@@ -10,8 +10,9 @@ import productLeleSpaghetti from "@/assets/product-lele-spaghetti.jpg";
 import productRizNafala from "@/assets/product-riz-nafala.png";
 import productRizMam from "@/assets/product-riz-mam.png";
 import productPizzaAlbarka from "@/assets/pizza-albarka.jpeg";
+import { isBurkina, isCoteIvoire } from "@/data/country";
 
-const products = [
+const burkinaProducts = [
   {
     id: 1,
     name: "Huile SIATOL",
@@ -76,8 +77,79 @@ const products = [
     image: productPizzaAlbarka,
   },
 ];
+const coteIvoireProducts = [
+  {
+    id: 1,
+    name: "Huile SIATOL",
+    description: "Huile de soja pure et naturelle, enrichie en vitamines",
+    variants: "1L, 3L, 5L, 20L",
+    image: productSiatol,
+  },
+  {
+    id: 2,
+    name: "Riz Nafi",
+    description: "Riz thaïlandais 100% brisures parfumées, super qualité",
+    variants: "25 kg, 50 kg",
+    image: productRizNafi,
+  },
+  {
+    id: 3,
+    name: "Dinor",
+    description: "Sweet Aroma, Great Taste - Riz jasmin premium",
+    variants: "5 L, 20 L",
+    image: productCindyRice,
+  },
+  {
+    id: 4,
+    name: "DJ Sparkling",
+    description: "Boissons pétillantes non alcoolisées, plusieurs saveurs",
+    variants: "75 cl",
+    image: productDjSparkling,
+  },
+  {
+    id: 5,
+    name: "Riz Mum's",
+    description: "Every mum's Choice - Riz long grain de qualité",
+    variants: "25 kg, 50 kg",
+    image: productMumsRice,
+  },
+  {
+    id: 6,
+    name: "Spaghetti Lele",
+    description: "Best choice, Best taste - Pâtes de qualité supérieure",
+    variants: "250g, 500g",
+    image: productLeleSpaghetti,
+  },
+  {
+    id: 7,
+    name: "Riz Nafala",
+    description: "Riz burkinabè 100% naturel, digestif et bon goût",
+    variants: "5 kg, 25 kg",
+    image: productRizNafala,
+  },
+  {
+    id: 8,
+    name: "Riz MAM",
+    description: "Riz bio du Burkina, 100% naturel",
+    variants: "25 kg",
+    image: productRizMam,
+  },
+  {
+    id: 9,
+    name: "Pizza-Albarka",
+    description: "🔥 La pizza qui fait fondre Ouagadougou. Savoureuse, généreuse et irrésistible.",
+    variants: "1 pizza",
+    image: productPizzaAlbarka,
+  },
+];
 
 const ProductsSection = () => {
+const countryId = Number(localStorage.getItem("country_id") || "1");
+
+const products =
+  countryId === 2
+    ? coteIvoireProducts
+    : burkinaProducts;
   return (
     <section className="section-padding bg-muted/30">
       <div className="container mx-auto">

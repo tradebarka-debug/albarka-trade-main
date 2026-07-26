@@ -32,14 +32,20 @@ export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-
+const selectedCountry = 
+Number(localStorage.getItem("country_id")) || 1;
   const fetchProducts = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('categorie', { ascending: true })
-      .order('name', { ascending: true });
+    const result: any = await supabase
+  .from("products" as any)
+  .select("*")
+  .eq("country_id", selectedCountry)
+  .order("category", { ascending: true })
+  .order("name", { ascending: true });
+
+  const data = result.data;
+const error = result.error;
+
 
    if (error) {
   console.error("ERREUR SUPABASE AJOUT PRODUIT:", error);
@@ -60,11 +66,11 @@ export const useProducts = () => {
 
   const createProduct = async (formData: ProductFormData, imageUrl: string | null) => {
     const stockQty = Number(formData.stockQuantity) || 0;
-    const { data, error } = await supabase
-      .from('products')
+    const { data, error }: any = await supabase
+      .from('products' as any)
       .insert({
         name: formData.name,
-        categorie: formData.category,
+        category: formData.category,
         price: Number(formData.price),
         unit: formData.unit || null,
         description: formData.description || null,
@@ -88,7 +94,7 @@ export const useProducts = () => {
     const stockQty = Number(formData.stockQuantity) || 0;
     const updateData: Partial<Product> = {
       name: formData.name,
-      categorie: formData.category,
+      category: formData.category,
       price: Number(formData.price),
       unit: formData.unit || null,
       description: formData.description || null,
@@ -101,19 +107,18 @@ export const useProducts = () => {
       updateData.image_url = imageUrl;
     }
 
-    const { data, error } = await supabase
-      .from('products')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-
+    const { data, error }:any = await supabase
+  .from("products" as any)
+  .update(updateData as any)
+  .eq("id", id)
+  .select()
+  .single();
     if (error) {
       console.error('Error updating product:', error);
       throw error;
     }
-
-    setProducts(prev => prev.map(p => p.id === id ? data : p));
+setProducts(prev => prev.map(p => p.id === id ? data : p));
+    
     return data;
   };
 

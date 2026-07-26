@@ -2,6 +2,10 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Phone, Mail, MapPin, MessageCircle, FileText } from "lucide-react";
 
+const isBurkina = Number(localStorage.getItem("country_id") || "1") === 1;
+const isCoteIvoire = Number(localStorage.getItem("country_id") || "1") === 2;
+const countryName = isBurkina ? "Burkina Faso" : "Côte d'Ivoire";
+
 const CTASection = () => {
   return (
     <section className="section-padding">
@@ -18,9 +22,8 @@ const CTASection = () => {
                 Contactez-<span className="text-primary">Nous</span>
               </h2>
               <div className="section-divider mb-6" />
-              <p className="text-muted-foreground text-lg mb-8">
-                Besoin d'informations ou d'un devis ? Notre équipe est à votre disposition 
-                pour répondre à toutes vos questions.
+              <p className="text-muted-foreground mb-8">
+               {`Notre équipe en ${countryName} est à votre disposition pour répondre à toutes vos demandes. Nous vous accompagnons dans tous vos projets.`}
               </p>
 
               {/* Contact Info */}
@@ -31,7 +34,7 @@ const CTASection = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Téléphone</p>
-                    <p className="font-semibold text-foreground">+226 02 02 94 94</p>
+                    <p className="font-semibold text-foreground">{isBurkina ? "+226 02 02 94 94" : "+225 07 14 14 66 30"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -49,7 +52,7 @@ const CTASection = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Adresse</p>
-                    <p className="font-semibold text-foreground">Ouagadougou, Burkina Faso</p>
+                    <p className="font-semibold text-foreground">{isBurkina ? "Ouagadougou, Burkina Faso" : "Abidjan, Côte d'Ivoire"}</p>
                   </div>
                 </div>
               </div>
@@ -67,13 +70,17 @@ const CTASection = () => {
                     Demander un Devis
                   </Button>
                 </Link>
-                <a 
-                  href="https://wa.me/22602029494" 
-                  target="_blank" 
+                <a
+                  href={
+                    isBurkina
+                      ? "https://wa.me/22602029494"
+                      : "https://wa.me/2250714146630"
+                  }
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="block"
                 >
-                  <Button 
+                  <Button
                     variant="outline"
                     className="w-full gap-3 h-14 text-lg rounded-lg border-2 border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground transition-all"
                   >
@@ -81,8 +88,12 @@ const CTASection = () => {
                     Contacter via WhatsApp
                   </Button>
                 </a>
-                <a href="tel:+22602029494" className="block">
-                  <Button 
+                <a href={
+                  isBurkina
+                    ? "tel:+22602029494"
+                    : "tel:+2250714146630"
+                } className="block">
+                  <Button
                     variant="outline"
                     className="w-full gap-3 h-14 text-lg rounded-lg border-2 border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary transition-all"
                   >

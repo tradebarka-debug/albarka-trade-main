@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, TrendingUp, Users, Award } from "lucide-react";
 import mainOeuvreClair from "@/assets/main-oeuvre.png";
+import { isBurkina, isCoteIvoire } from "@/data/country";
 
 const FormationsSection = () => {
   return (
