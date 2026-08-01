@@ -1,13 +1,39 @@
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function CommissionsRepresentant() {
+  const [representant, setRepresentant] = useState<any>(null);
+
+  useEffect(() => {
+    const codeRepresentant = localStorage.getItem("representantCode");
+
+    if (!codeRepresentant) return;
+
+    const chargerRepresentant = async () => {
+      const { data, error } = await supabase
+        .from("representants")
+        .select("*")
+        .eq("code", codeRepresentant)
+        .single();
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setRepresentant(data as any);
+    };
+
+    chargerRepresentant();
+  }, []);
   return (
     <RepresentantLayout title="Mes Commissions">
 
       <div className="bg-white rounded-2xl shadow-lg p-8">
 
-        <h1 className="text-3xl font-bold mb-8">
+        <h1 className="text-3xl font-bold text-black mb-8">
           Mes Commissions
         </h1>
 
@@ -16,21 +42,21 @@ export default function CommissionsRepresentant() {
           <div className="border rounded-xl p-6">
             <p className="text-gray-500">Solde disponible</p>
             <h2 className="text-3xl font-bold text-green-600">
-              125 000 FCFA
+              {representant?.commission_disponible?.toLocaleString() ?? "0"} FCFA
             </h2>
           </div>
 
           <div className="border rounded-xl p-6">
             <p className="text-gray-500">En attente</p>
             <h2 className="text-3xl font-bold text-orange-500">
-              35 000 FCFA
+              0 FCFA
             </h2>
           </div>
 
           <div className="border rounded-xl p-6">
             <p className="text-gray-500">Total gagné</p>
             <h2 className="text-3xl font-bold text-blue-600">
-              160 000 FCFA
+              {representant?.commission_totale?.toLocaleString() ?? "0"} FCFA
             </h2>
           </div>
 

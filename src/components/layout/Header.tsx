@@ -63,7 +63,7 @@ const Header = () => {
             <h1 className="font-display font-bold text-lg md:text-xl text-foreground leading-tight group-hover:text-primary transition-colors">
               Albarka Trade
             </h1>
-            <p className="text-xs text-primary font-medium tracking-wider">RCI</p>
+            <p className="text-xs text-primary font-medium tracking-wider">International</p>
           </div>
         </Link>
 

@@ -7,32 +7,32 @@ export default function AssistanceRepresentant() {
 
       <div className="bg-white rounded-2xl shadow-lg p-8">
 
-        <h1 className="text-3xl font-bold mb-6">
+        <h1 className="text-3xl font-bold text-black mb-6">
           Centre d'assistance
         </h1>
 
-        <p className="text-gray-600 mb-8">
+        <p className="text-gray-600 text-black mb-8">
           Notre équipe est disponible pour vous accompagner.
         </p>
 
         <div className="grid md:grid-cols-2 gap-6">
 
           <div className="border rounded-xl p-6">
-            <h2 className="text-xl font-bold mb-3">
+            <h2 className="text-xl font-bold text-black mb-3">
               Téléphone
             </h2>
             <p>+225 XX XX XX XX XX</p>
           </div>
 
           <div className="border rounded-xl p-6">
-            <h2 className="text-xl font-bold mb-3">
+            <h2 className="text-xl font-bold text-black mb-3">
               Email
             </h2>
             <p>contact@albarka-trade.com</p>
           </div>
 
           <div className="border rounded-xl p-6 md:col-span-2">
-            <h2 className="text-xl font-bold mb-4">
+            <h2 className="text-xl font-bold text-black mb-4">
               Besoin d'aide ?
             </h2>
 

@@ -6,14 +6,14 @@ export default function FAQRepresentant() {
 
       <div className="bg-white rounded-2xl shadow-lg p-8">
 
-        <h1 className="text-3xl font-bold mb-8">
+        <h1 className="text-3xl font-bold text-black mb-8">
           Questions fréquentes
         </h1>
 
         <div className="space-y-6">
 
           <div className="border rounded-xl p-5">
-            <h2 className="font-bold text-lg">
+            <h2 className="font-bold text-black text-lg">
               Comment recevoir mes commissions ?
             </h2>
             <p className="mt-2 text-gray-600">
@@ -22,7 +22,7 @@ export default function FAQRepresentant() {
           </div>
 
           <div className="border rounded-xl p-5">
-            <h2 className="font-bold text-lg">
+            <h2 className="font-bold text-black text-lg">
               Comment parrainer un nouveau représentant ?
             </h2>
             <p className="mt-2 text-gray-600">
@@ -31,7 +31,7 @@ export default function FAQRepresentant() {
           </div>
 
           <div className="border rounded-xl p-5">
-            <h2 className="font-bold text-lg">
+            <h2 className="font-bold text-black text-lg">
               Comment renouveler mon pack ?
             </h2>
             <p className="mt-2 text-gray-600">
@@ -40,7 +40,7 @@ export default function FAQRepresentant() {
           </div>
 
           <div className="border rounded-xl p-5">
-            <h2 className="font-bold text-lg">
+            <h2 className="font-bold text-black text-lg">
               Que faire si j'ai oublié mon Code représentant ou mon PIN ?
             </h2>
             <p className="mt-2 text-gray-600">

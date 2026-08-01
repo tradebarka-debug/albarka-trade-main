@@ -11,7 +11,7 @@ export interface FastFoodItem {
   is_active: boolean;
   sort_order: number;
   created_at: string;
-  updated_at: string;
+ updated_at?: string | null;
 }
 
 export interface FastFoodFormData {
@@ -31,9 +31,13 @@ export const useFastFoodItems = () => {
 
   const fetchItems = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from("fastfood_items")
-      .select("*")
+    const selectedCountry =
+  Number(localStorage.getItem("country_id")) || 1;
+
+const { data, error } = await supabase
+  .from("fastfood_items")
+  .select("*")
+  .eq("country_id", selectedCountry)
       .order("category", { ascending: true })
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true });

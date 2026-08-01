@@ -164,8 +164,8 @@ export default function RepresentantForm() {
                         }
                         const codeRepresentant = "ATI-REP-" + Date.now();
                         const { error } = await supabase
-                            .from("representants")
-                            .insert({
+                            .from("representants" as any)
+                            .insert({ 
                                 code: codeRepresentant,
                                 nom: form.nom,
                                 prenom: form.prenom,

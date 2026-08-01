@@ -142,17 +142,23 @@ const RestaurantPage = () => {
 
     const fetchRestaurant = async () => {
 
-        const { data }: any = await supabase
-            .from("restaurant_partners")
-            .select("*")
-            .eq("country_id", selectedCountry);
+        const selectedCountry =
+  Number(localStorage.getItem("country_id")) || 1;
+
+const { data, error } = await supabase
+    .from("restaurant_partners")
+    .select("*")
+    .eq("country_id", selectedCountry);
         setrestaurant_partners(data || []);
 
         const currentRestaurant = data?.find(
             (item: any) => item.slug === slug
         );
 
-        if (!currentRestaurant) return;
+       if (!currentRestaurant) {
+    setMenuItems([]);
+    return;
+}
 
         const { data: menuData } = await supabase
             .from("restaurant_menu_items")
@@ -163,8 +169,8 @@ const RestaurantPage = () => {
         setMenuItems(menuData || []);
     };
     useEffect(() => {
-        fetchRestaurant();
-    }, [selectedCountry]);
+    fetchRestaurant();
+}, [selectedCountry, slug]);
     const { addItem } = useCart();
 
     const addToCart = (item: any) => {
@@ -235,7 +241,7 @@ const RestaurantPage = () => {
 
                                 <div className="mt-5 flex gap-2">
                                     <a
-                                        href="https://wa.me/22602301515"
+                                        href={`https://wa.me/${restaurant.whatsapp}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold text-center"

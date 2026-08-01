@@ -1,6 +1,32 @@
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function FilleulsRepresentant() {
+  const [representant, setRepresentant] = useState<any>(null);
+
+  useEffect(() => {
+    const codeRepresentant = localStorage.getItem("representantCode");
+
+    if (!codeRepresentant) return;
+
+    const chargerRepresentant = async () => {
+      const { data, error } = await supabase
+        .from("representants")
+        .select("*")
+        .eq("code", codeRepresentant)
+        .single();
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setRepresentant(data as any);
+    };
+
+    chargerRepresentant();
+  }, []);
   return (
     <RepresentantLayout title="Mes Filleuls">
 
@@ -15,21 +41,21 @@ export default function FilleulsRepresentant() {
           <div className="border rounded-xl p-6 text-center">
             <p className="text-gray-500">Nombre de filleuls</p>
             <h2 className="text-4xl font-bold text-green-600">
-              18
+             {representant?.nombre_filleuls ?? 0}
             </h2>
           </div>
 
           <div className="border rounded-xl p-6 text-center">
             <p className="text-gray-500">Commissions générées</p>
             <h2 className="text-3xl font-bold text-blue-600">
-              275 000 FCFA
+             {representant?.commission_totale?.toLocaleString() ?? "0"} FCFA
             </h2>
           </div>
 
           <div className="border rounded-xl p-6 text-center">
             <p className="text-gray-500">Filleuls actifs</p>
             <h2 className="text-4xl font-bold text-orange-500">
-              15
+              0
             </h2>
           </div>
 

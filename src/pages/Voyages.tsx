@@ -5,33 +5,44 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
+import QRCode from "react-qr-code";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { Bus, Calendar, MapPin, Users, QrCode, Phone, Mail, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 const Voyages = () => {
-  const { data: transportCompanies = [] } = useQuery({
-    queryKey: ["transport_companies"],
+  const selectedCountry =
+    Number(localStorage.getItem("country_id")) || 1;
+  console.log("selectedCountry =", selectedCountry);
+  const { data: routes = [] } = useQuery({
+    queryKey: ["routes", selectedCountry],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transport_companies")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
+      const { data, error } = await (supabase as any)
+        .from("routes")
+        .select(`
+        *,
+        transport_companies(*),
+        departure:cities!routes_departure_city_id_fkey(*),
+        destination:cities!routes_destination_city_id_fkey(*)
+      `)
+        .eq("active", true)
+        .eq("country_id", selectedCountry);
+
       if (error) throw error;
+      console.log("ROUTES =", data);
       return data;
     },
   });
@@ -40,11 +51,13 @@ const Voyages = () => {
     queryKey: ["destinations"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("destinations")
+        .from("cities")
         .select("*")
-        .eq("is_active", true)
         .order("name");
-      if (error) throw error;
+      if (error) {
+        console.log(error);
+        throw error;
+      }
       return data;
     },
   });
@@ -55,12 +68,14 @@ const Voyages = () => {
       const { data, error } = await supabase
         .from("courier_services")
         .select("*")
-        .eq("is_active", true)
         .order("created_at");
       if (error) throw error;
       return data;
     },
   });
+  const [selectedCompany, setSelectedCompany] = useState<any>(null);
+  const [availableRoutes, setAvailableRoutes] = useState<any[]>([]);
+
   const [formData, setFormData] = useState({
     company: "",
     departure: "",
@@ -71,8 +86,10 @@ const Voyages = () => {
     phone: "",
   });
   const [showPayment, setShowPayment] = useState(false);
+  const [booking, setBooking] = useState<any>(null);
   const [selectedCourrier, setSelectedCourrier] = useState<{ name: string; startingPrice: number } | null>(null);
   const [courrierForm, setCourrierForm] = useState({ name: "", phone: "", description: "" });
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -82,23 +99,103 @@ const Voyages = () => {
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
+    console.log("name =", name);
+    console.log("value =", value);
+    let updatedForm = {
+      ...formData,
       [name]: value,
-    }));
+    };
+
+    if (name === "company") {
+      const company = routes.find(
+        (r: any) => String(r.transport_companies?.id) === value
+      );
+
+      const companyRoutes = routes.filter(
+        (r: any) => String(r.transport_companies?.id) === value
+      );
+      console.log("availableRoutes =", companyRoutes);
+      setAvailableRoutes(companyRoutes);
+
+      updatedForm.departure = "";
+      updatedForm.destination = "";
+    }
+
+    setFormData(updatedForm);
   };
 
-  const handleSubmitBooking = () => {
-    if (!formData.company || !formData.departure || !formData.destination || !formData.date || !formData.name || !formData.phone) {
+  const handleSubmitBooking = async () => {
+    if (
+      !formData.company ||
+      !formData.departure ||
+      !formData.destination ||
+      !formData.date ||
+      !formData.name ||
+      !formData.phone
+    ) {
       toast.error("Veuillez remplir tous les champs obligatoires");
       return;
     }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const selectedDate = new Date(formData.date);
+
+    if (selectedDate < today) {
+      toast.error("La date du voyage doit être aujourd'hui ou une date future.");
+      return;
+    }
+    
+const selectedRoute = routes.find(
+  (r: any) =>
+    r.departure?.name === formData.departure &&
+    r.destination?.name === formData.destination &&
+    String(r.transport_companies?.id) === formData.company
+);
+
+console.log("selectedRoute =", selectedRoute);
+console.log("voyage_id =", selectedRoute?.voyage_id);
+    const { data, error } = await supabase
+      .from("bookings")
+      .insert([
+        {
+  company: selectedRoute?.transport_companies?.nom,
+  company_id: selectedRoute?.transport_companies?.id,
+
+  departure: selectedRoute?.departure?.name,
+  departure_city_id: selectedRoute?.departure?.id,
+
+  destination: selectedRoute?.destination?.name,
+  destination_city_id: selectedRoute?.destination?.id,
+
+  voyage_id: selectedRoute?.voyage_id,
+  travel_date: formData.date,
+  passenger_name: formData.name,
+  phone: formData.phone,
+  seats: Number(formData.passengers),
+
+  amount: selectedRoute
+    ? selectedRoute.price * Number(formData.passengers)
+    : 0,
+}
+      ])
+      .select()
+      .single();
+    if (error) {
+  console.error(error);
+  alert(JSON.stringify(error, null, 2));
+  return;
+}
+
+    setBooking(data);
     setShowPayment(true);
   };
+  const handleConfirmPayment = async () => {
+    toast.success("Demande de réservation envoyée ! Nous vous contacterons pour confirmer.");
 
-  const handleConfirmPayment = () => {
-    toast.success("Demande de réservation envoyée! Nous vous contacterons pour confirmer.");
     setShowPayment(false);
+
     setFormData({
       company: "",
       departure: "",
@@ -109,7 +206,6 @@ const Voyages = () => {
       phone: "",
     });
   };
-
   return (
     <main className="min-h-screen">
       {/* Header */}
@@ -123,7 +219,7 @@ const Voyages = () => {
               Voyages et Courriers
             </h1>
             <p className="text-muted-foreground mt-4 text-lg">
-              Réservez vos billets de bus et profitez de notre service de collecte 
+              Réservez vos billets de bus et profitez de notre service de collecte
               et livraison de courriers au Burkina Faso.
             </p>
           </div>
@@ -135,17 +231,19 @@ const Voyages = () => {
         <div className="container mx-auto px-4">
           <p className="text-sm text-muted-foreground mb-4">Compagnies partenaires</p>
           <div className="flex flex-wrap gap-4">
-            {transportCompanies.map((company: any) => (
+            {Array.from(
+              new Map(
+                routes.map((r: any) => [
+                  r.transport_companies?.nom,
+                  r.transport_companies,
+                ])
+              ).values()
+            ).map((company: any) => (
               <div
-                key={company.id}
+                key={company?.id}
                 className="flex items-center gap-2 bg-muted px-4 py-2 rounded-full"
               >
-                {company.logo_url ? (
-                  <img src={company.logo_url} alt={company.name} className="w-6 h-6 rounded object-contain" />
-                ) : (
-                  <span className="text-xl">{company.logo}</span>
-                )}
-                <span className="text-sm font-medium">{company.name}</span>
+                <span className="text-sm font-medium">{company?.nom}</span>
               </div>
             ))}
           </div>
@@ -179,10 +277,23 @@ const Voyages = () => {
                       <SelectTrigger className="mt-1">
                         <SelectValue placeholder="Choisir une compagnie" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {transportCompanies.map((company: any) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.logo} {company.name}
+                      <SelectContent className="bg-background text-white">
+                        {Array.from(
+                          new Map(
+                            routes.map((r: any) => [
+                              r.company_id,
+                              r.transport_companies,
+                            ])
+                          ).values()
+                        ).map((company: any) => (
+                          <SelectItem
+                            key={company.nom}
+                            value={String(company.id)}
+                            className="text-white hover:text-white focus:text-white"
+                          >
+                            <span className="text-white">
+                              {company.nom}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -193,6 +304,7 @@ const Voyages = () => {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Ville de départ *</Label>
+
                       <Select
                         value={formData.departure}
                         onValueChange={(value) => handleSelectChange("departure", value)}
@@ -200,8 +312,19 @@ const Voyages = () => {
                         <SelectTrigger className="mt-1">
                           <SelectValue placeholder="Départ" />
                         </SelectTrigger>
+
                         <SelectContent>
-                          {destinations.map((d: any) => (
+                          {Array.from(
+                            new Map(
+                              availableRoutes.map((r: any) => [
+                                r.departure_city_id,
+                                {
+                                  id: r.departure_city_id,
+                                  name: r.departure?.name
+                                },
+                              ])
+                            ).values()
+                          ).map((d: any) => (
                             <SelectItem key={d.id} value={d.name}>
                               <div className="flex items-center gap-2">
                                 <MapPin className="w-4 h-4" />
@@ -214,6 +337,7 @@ const Voyages = () => {
                     </div>
                     <div>
                       <Label>Ville d'arrivée *</Label>
+
                       <Select
                         value={formData.destination}
                         onValueChange={(value) => handleSelectChange("destination", value)}
@@ -221,8 +345,19 @@ const Voyages = () => {
                         <SelectTrigger className="mt-1">
                           <SelectValue placeholder="Destination" />
                         </SelectTrigger>
+
                         <SelectContent>
-                          {destinations.map((d: any) => (
+                          {Array.from(
+                            new Map(
+                              availableRoutes.map((r: any) => [
+                                r.destination_city_id,
+                                {
+                                  id: r.destination_city_id,
+                                  name: r.destination?.name
+                                },
+                              ])
+                            ).values()
+                          ).map((d: any) => (
                             <SelectItem key={d.id} value={d.name}>
                               <div className="flex items-center gap-2">
                                 <MapPin className="w-4 h-4" />
@@ -247,6 +382,7 @@ const Voyages = () => {
                           type="date"
                           value={formData.date}
                           onChange={handleInputChange}
+                          min={new Date().toISOString().split("T")[0]}
                           className="pl-10"
                         />
                       </div>
@@ -318,11 +454,35 @@ const Voyages = () => {
                     <QrCode className="w-10 h-10 text-primary" />
                   </div>
                   <h2 className="font-display text-2xl font-bold text-foreground">
-                    Paiement Orange Money
+                    Paiement Wave
                   </h2>
+                  <p className="font-semibold text-lg text-primary">
+                    Numéro Wave : +226 76 32 23 36
+                  </p>
+                  <p className="text-xl font-bold text-green-600 mt-2">
+                    ({booking?.amount} FCFA)
+                  </p>
                   <p className="text-muted-foreground mt-2">
                     Effectuez le paiement et entrez la référence de transaction
                   </p>
+                  {booking && (
+                    <div className="flex flex-col items-center gap-4 mb-6">
+                      <QRCode
+                        value={`${window.location.origin}/booking/${booking.booking_number}`}
+                        size={180}
+
+                      />
+                      <div className="text-center">
+                        <p className="font-semibold">Numéro de réservation</p>
+                        <p className="text-lg font-bold text-primary">
+                          {booking.booking_number}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Présentez ce QR Code lors de l'embarquement.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Booking Summary */}
@@ -331,7 +491,7 @@ const Voyages = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Compagnie</span>
-                      <span>{transportCompanies.find((c: any) => c.id === formData.company)?.name}</span>
+                      <span>{selectedCompany?.transport_companies?.nom}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Trajet</span>
@@ -345,6 +505,23 @@ const Voyages = () => {
                       <span className="text-muted-foreground">Passagers</span>
                       <span>{formData.passengers}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Nom</span>
+                      <span>{formData.name}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Téléphone</span>
+                      <span>{formData.phone}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Montant</span>
+                      <span className="font-bold text-primary">
+                        {booking?.amount} FCFA
+                      </span>
+                    </div>
+
                   </div>
                 </div>
 
@@ -353,14 +530,14 @@ const Voyages = () => {
                   <div className="aspect-square bg-muted rounded-lg flex items-center justify-center mb-4">
                     <div className="text-center">
                       <QrCode className="w-24 h-24 text-primary mx-auto mb-2" />
-                      <p className="text-xs text-muted-foreground">QR Code Orange Money</p>
+                      <p className="text-xs text-muted-foreground">QR Code Wave</p>
                     </div>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">Numéro Orange Money</p>
+                    <p className="text-sm text-muted-foreground mb-1">Numéro wave</p>
                     <div className="flex items-center justify-center gap-2">
                       <Phone className="w-5 h-5 text-primary" />
-                      <span className="text-xl font-bold">+226 02 02 94 94</span>
+                      <span className="text-xl font-bold">+226 76 32 2336</span>
                     </div>
                   </div>
                 </div>

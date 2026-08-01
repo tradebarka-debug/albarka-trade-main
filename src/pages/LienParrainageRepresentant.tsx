@@ -1,15 +1,41 @@
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function LienParrainageRepresentant() {
-  const lien = "https://albarka-trade.com/rejoindre?ref=ATI-000001";
+  const [representant, setRepresentant] = useState<any>(null);
+
+  useEffect(() => {
+    const codeRepresentant = localStorage.getItem("representantCode");
+
+    if (!codeRepresentant) return;
+
+    const chargerRepresentant = async () => {
+      const { data, error } = await supabase
+        .from("representants")
+        .select("*")
+        .eq("code", codeRepresentant)
+        .single();
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setRepresentant(data as any);
+    };
+
+    chargerRepresentant();
+  }, []);
+  const lien = `https://albarka-trade.com/rejoindre?ref=${representant?.code ?? ""}`;
 
   return (
     <RepresentantLayout title="Mon Lien de Parrainage">
 
       <div className="bg-white rounded-2xl shadow-lg p-8">
 
-        <h1 className="text-3xl font-bold mb-6">
+        <h1 className="text-3xl font-bold text-black mb-6">
           Mon Lien de Parrainage
         </h1>
 
@@ -26,21 +52,21 @@ export default function LienParrainageRepresentant() {
           <div className="border rounded-xl p-6 text-center">
             <p className="text-gray-500">Clics</p>
             <h2 className="text-3xl font-bold text-blue-600">
-              245
+              0
             </h2>
           </div>
 
           <div className="border rounded-xl p-6 text-center">
             <p className="text-gray-500">Inscriptions</p>
             <h2 className="text-3xl font-bold text-green-600">
-              18
+              {representant?.nombre_filleuls ?? 0}
             </h2>
           </div>
 
           <div className="border rounded-xl p-6 text-center">
             <p className="text-gray-500">Taux de conversion</p>
             <h2 className="text-3xl font-bold text-orange-500">
-              7,3%
+              0%
             </h2>
           </div>
 

@@ -47,6 +47,10 @@ import QRCodeRepresentant from "@/pages/QRCodeRepresentant";
 import AcheterPackRepresentant from "@/pages/AcheterPackRepresentant";
 import AssistanceRepresentant from "@/pages/AssistanceRepresentant";
 import FAQRepresentant from "@/pages/FAQRepresentant";
+import MotDePasseOublieRepresentant from "./pages/MotDePasseOublieRepresentant";
+import VerificationOtpRepresentant from "./pages/VerificationOtpRepresentant";
+import NouveauPinRepresentant from "./pages/NouveauPinRepresentant";
+import BookingVerification from "@/pages/BookingVerification";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -103,6 +107,10 @@ const App = () => (
                 path="/profil-representant"
                 element={<ProfilRepresentant />}
               />
+              <Route
+                path="/mot-de-passe-oublie"
+                element={<MotDePasseOublieRepresentant />}
+              />
 
               <Route
                 path="/pack-representant"
@@ -143,7 +151,18 @@ const App = () => (
                 path="/assistance-representant"
                 element={<AssistanceRepresentant />}
               />
-
+              <Route
+                path="/verification-otp"
+                element={<VerificationOtpRepresentant />}
+              />
+              <Route
+                path="/representant/nouveau-pin"
+                element={<NouveauPinRepresentant />}
+              />
+              <Route
+                path="/booking/:bookingNumber"
+                element={<BookingVerification />}
+              />
               <Route
                 path="/faq-representant"
                 element={<FAQRepresentant />}
@@ -176,6 +195,7 @@ const App = () => (
                         <Route path="/devenir-representant" element={<Representant />} />
                         <Route path="/connexion-representant" element={<ConnexionRepresentant />} />
                         <Route path="/inscription-representant" element={<RepresentantForm />} />
+                        <Route path="/mot-de-passe-oublie" element={<MotDePasseOublieRepresentant />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </div>

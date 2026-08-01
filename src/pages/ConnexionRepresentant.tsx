@@ -3,27 +3,39 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Lock, User } from "lucide-react";
+import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 export default function ConnexionRepresentant() {
   const [code, setCode] = useState("");
   const [pin, setPin] = useState("");
+  const navigate = useNavigate();
 
-  const handleLogin = () => {
-    if (code === "" || pin === "") {
-      alert("Veuillez renseigner votre Code Représentant et votre Code PIN.");
-      return;
-    }
+ const handleLogin = async () => {
+  if (!code || !pin) {
+    alert("Veuillez renseigner votre Code Représentant et votre Code PIN.");
+    return;
+  }
 
-    const codeEnregistre = localStorage.getItem("representantCode");
-    const pinEnregistre = localStorage.getItem("representantPin");
+  const { data, error } = await supabase
+    .from("representants")
+    .select("*")
+    .eq("code", code)
+    .eq("pin", pin)
+    .single();
 
-    if (code === codeEnregistre && pin === pinEnregistre) {
-      window.location.href = "/dashboard-representant";
-    } else {
-      alert("Code représentant ou Code PIN incorrect.");
-    }
-  };
+  if (error || !data) {
+    alert("Code représentant ou Code PIN incorrect.");
+    return;
+  }
 
+  localStorage.setItem("representantId", data.id);
+  localStorage.setItem("representantCode", data.code);
+  localStorage.setItem("representantEmail", data.email);
+
+ navigate("/dashboard-representant");
+};
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <Card className="w-full max-w-md shadow-xl rounded-2xl">
@@ -73,7 +85,14 @@ export default function ConnexionRepresentant() {
                 />
               </div>
             </div>
-
+            <div className="text-center mt-2 mb-6">
+              <Link
+                to="/mot-de-passe-oublie"
+                className="text-sm text-primary hover:underline"
+              >
+                Mot de passe oublié ?
+              </Link>
+            </div>
             <Button
               className="w-full h-12 text-lg"
               onClick={handleLogin}

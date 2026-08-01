@@ -1,9 +1,32 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
-import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+
 export default function DashboardRepresentant() {
     // DashboardRepresentant.tsx
 
+    const [representant, setRepresentant] = useState<any>(null);
+
+    const codeRepresentant = localStorage.getItem("representantCode");
+    useEffect(() => {
+        const chargerRepresentant = async () => {
+            if (!codeRepresentant) return;
+
+            const { data } = await supabase
+                .from("representants" as any)
+                .select("*")
+                .eq("code", codeRepresentant)
+                .single();
+
+            if (data) {
+                setRepresentant(data);
+            }
+        };
+
+        chargerRepresentant();
+    }, [codeRepresentant]);
     const menu = [
         {
             title: "👤 Mon Profil",
@@ -56,7 +79,7 @@ export default function DashboardRepresentant() {
                 </h1>
 
                 <h2 className="text-3xl font-bold mt-2">
-                    Rabo Souleymane
+                   {representant?.prenom} {representant?.nom}
                 </h2>
 
                 <div className="grid md:grid-cols-3 gap-6 mt-8">
@@ -64,7 +87,7 @@ export default function DashboardRepresentant() {
                     <div>
                         <p className="text-sm opacity-80">Code Représentant</p>
                         <p className="text-xl font-bold">
-                            ATI-REP-000001
+                            {representant?.code}
                         </p>
                     </div>
 
@@ -74,7 +97,7 @@ export default function DashboardRepresentant() {
                         </p>
 
                         <p className="text-xl font-bold text-green-200">
-                            🟢 Compte actif
+                             {representant?.statut || "En attente"}
                         </p>
                     </div>
 
@@ -84,7 +107,7 @@ export default function DashboardRepresentant() {
                         </p>
 
                         <p className="text-xl font-bold">
-                            Diamant
+                           {representant?.pack || "Aucun pack"}
                         </p>
                     </div>
 
@@ -94,7 +117,7 @@ export default function DashboardRepresentant() {
                         </p>
 
                         <p className="text-xl">
-                            Burkina Faso
+                            {representant?.pays}
                         </p>
                     </div>
 
@@ -104,7 +127,7 @@ export default function DashboardRepresentant() {
                         </p>
 
                         <p className="text-xl">
-                            +226 XX XX XX XX
+                            {representant?.telephone}
                         </p>
                     </div>
 
@@ -114,7 +137,7 @@ export default function DashboardRepresentant() {
                         </p>
 
                         <p className="text-2xl font-bold text-yellow-300">
-                            125 000 FCFA
+                            {representant?.solde || 0} FCFA
                         </p>
                     </div>
 

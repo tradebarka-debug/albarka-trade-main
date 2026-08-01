@@ -34,6 +34,7 @@ const Suppliers = () => {
     const loadSuppliers = async () => {
         const selectedcountry =
             Number(localStorage.getItem("country_id")) || 1;
+            console.log("country_id =", selectedcountry);
 
         const { data, error } = await (supabase as any)
             .from("suppliers")
@@ -41,29 +42,16 @@ const Suppliers = () => {
             .eq("country_id", selectedcountry);
 
         const { data: productsData, error: productsError } = await (supabase as any)
-            .from("supplier_products")
+            .from("products")
             .select("*")
+            .eq("country_id", selectedcountry);
 
 
         setProducts(productsData || []);
-        console.table(
-            productsData?.map((p: any) => ({
-                id: p.id,
-                supplier_id: p.supplier_id,
-                product_name: p.product_name,
-                country_id: p.country_id
-            }))
-        );
-
-
+       
         if (!error) {
             setSuppliers(data || []);
-            console.table(data?.map(s => ({
-                id: s.id,
-                nom: s.company_name,
-                categorie: s.category
-            })));
-
+           
         }
     };
     const getFlag = (Country: string) => {
@@ -176,9 +164,56 @@ const Suppliers = () => {
                 </div>
             </div>
             <div
-
                 ref={scrollRef}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4 px-4">
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4 px-4"
+            >
+                {filteredSuppliers.map((supplier: any) => {
+                    const supplierProducts = products.filter(
+                        (product: any) => product.supplier_id === supplier.id
+                    );
+
+                    return (
+                        <div
+                            key={supplier.id}
+                            onClick={() => navigate(`/supplier/${supplier.id}`)}
+                            className="bg-[#1f1f1f] rounded-2xl overflow-hidden shadow-lg cursor-pointer hover:scale-105 transition"
+                        >
+                            <img
+                                src={supplier.logo_url}
+                                alt={supplier.company_name}
+                                className="w-full h-56 object-cover"
+                            />
+
+                            <div className="p-4">
+                                <h2 className="text-2xl font-bold text-white">
+                                    {supplier.company_name}
+                                </h2>
+
+                                <p className="text-yellow-400 mt-1">
+                                    {getFlag(supplier.country)} {supplier.country}
+                                </p>
+
+                                <p className="text-gray-400 mt-2">
+                                    {supplier.category}
+                                </p>
+
+                                <p className="text-gray-300 mt-3 line-clamp-2">
+                                    {supplier.description}
+                                </p>
+
+                                <div className="mt-4 flex justify-between items-center">
+                                    <span className="text-yellow-400 font-semibold">
+                                        {supplierProducts.length} produits
+                                    </span>
+
+                                    <button className="bg-yellow-500 text-black px-4 py-2 rounded-lg">
+                                        Voir
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

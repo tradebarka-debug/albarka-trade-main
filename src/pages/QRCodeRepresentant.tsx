@@ -1,23 +1,45 @@
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
-const codeRepresentant = localStorage.getItem("representantCode") || "ATI-REP-0000";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+export default function QRCodeRepresentant() {
+    const [representant, setRepresentant] = useState<any>(null);
+
+    useEffect(() => {
+        const code = localStorage.getItem("representantCode");
+
+        if (!code) return;
+
+        const chargerRepresentant = async () => {
+            const { data, error } = await supabase
+                .from("representants")
+                .select("*")
+                .eq("code", code)
+                .single();
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            setRepresentant(data as any);
+        };
+
+        chargerRepresentant();
+    }, []);
+
+    const codeRepresentant = representant?.code || "";
 
 const lienParrainage =
-`${window.location.origin}/inscription-representant?parrain=${codeRepresentant}`;
-export default function QRCodeRepresentant() {
-    
-    const codeRepresentant =
-  localStorage.getItem("representantCode") || "ATI-REP-000001";
-
-    const lienParrainage =
-        `${window.location.origin}/inscription-representant?parrain=${codeRepresentant}`;
+`https://albarka-trade.com/inscription-representant?parrain=${codeRepresentant}`;
     return (
         <RepresentantLayout title="Mon QR Code">
 
             <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
 
-                <h1 className="text-3xl font-bold mb-6">
+                <h1 className="text-3xl font-bold text-black mb-6">
                     Mon QR Code
                 </h1>
 
