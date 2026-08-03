@@ -210,7 +210,7 @@ const AdminSuppliers = () => {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "Modifier le fournisseur" : "Ajouter un fournisseur"}</DialogTitle>
           </DialogHeader>
@@ -266,6 +266,9 @@ const AdminSuppliers = () => {
           </div>
 
           <div className="flex justify-end gap-2 mt-4">
+            <div className="pb-8">
+        
+            </div>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
             <Button onClick={saveSupplier}>Sauvegarder</Button>
           </div>
