@@ -14,6 +14,10 @@ export interface Product {
   image_url?: string | null; // For backward compatibility with existing data
   in_stock: boolean;
   stock_quantity: number;
+  is_liquidation?: boolean | null;
+  liquidation_price?: number | null;
+  liquidation_until?: string | null;
+  country_id?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -26,29 +30,33 @@ export interface ProductFormData {
   description: string;
   inStock: boolean;
   stockQuantity: string;
+  isLiquidation?: boolean;
+  liquidationPrice?: string;
+  liquidationUntil?: string;
 }
+
+const getSelectedCountry = () => Number(localStorage.getItem("country_id")) || 1;
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-const selectedCountry = 
-Number(localStorage.getItem("country_id")) || 1;
+
   const fetchProducts = async () => {
+    const selectedCountry = getSelectedCountry();
     setIsLoading(true);
     const result: any = await supabase
-  .from("products" as any)
-  .select("*")
-  .eq("country_id", selectedCountry)
-  .order("category", { ascending: true })
-  .order("name", { ascending: true });
+      .from("products" as any)
+      .select("*")
+      .eq("country_id", selectedCountry)
+      .order("category", { ascending: true })
+      .order("name", { ascending: true });
 
-  const data = result.data;
-const error = result.error;
+    const data = result.data;
+    const error = result.error;
 
-
-   if (error) {
-  console.error("ERREUR SUPABASE AJOUT PRODUIT:", error);
+    if (error) {
+      console.error("ERREUR SUPABASE AJOUT PRODUIT:", error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les produits",
@@ -62,10 +70,18 @@ const error = result.error;
 
   useEffect(() => {
     fetchProducts();
+
+    const handleStorageChange = () => {
+      fetchProducts();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   const createProduct = async (formData: ProductFormData, imageUrl: string | null) => {
     const stockQty = Number(formData.stockQuantity) || 0;
+    const selectedCountry = getSelectedCountry();
     const { data, error }: any = await supabase
       .from('products' as any)
       .insert({
@@ -77,6 +93,10 @@ const error = result.error;
         in_stock: formData.inStock,
         stock_quantity: Number(stockQty) || 0,
         image_url: imageUrl || null,
+        country_id: selectedCountry,
+        is_liquidation: Boolean(formData.isLiquidation),
+        liquidation_price: formData.liquidationPrice ? Number(formData.liquidationPrice) : null,
+        liquidation_until: formData.liquidationUntil || null,
       } as any)
       .select()
       .single();
@@ -90,7 +110,12 @@ const error = result.error;
     return data;
   };
 
-  const updateProduct = async (id: string, formData: ProductFormData, imageUrl: string | null | undefined) => {
+  const updateProduct = async (
+    id: string,
+    formData: ProductFormData,
+    imageUrl: string | null | undefined,
+    extraData: Partial<Product> = {}
+  ) => {
     const stockQty = Number(formData.stockQuantity) || 0;
     const updateData: Partial<Product> = {
       name: formData.name,
@@ -100,6 +125,7 @@ const error = result.error;
       description: formData.description || null,
       in_stock: formData.inStock,
       stock_quantity: stockQty,
+      ...extraData,
     };
 
     // Only update image if a new one was provided

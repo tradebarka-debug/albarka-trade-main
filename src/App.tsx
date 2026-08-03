@@ -11,7 +11,7 @@ import MobileBottomNav from "./components/layout/MobileBottomNav";
 import Index from "./pages/Index";
 import Boutique from "./pages/Boutique";
 import AdminOrders from "@/pages/AdminOrders";
-import AdminPartners from "@/pages/AdminPartners";
+import AdminSuppliers from "./pages/admin/AdminSuppliers";
 import AdminRestaurants from "./pages/admin/AdminRestaurants";
 import RestaurantMenus from "./pages/admin/RestaurantMenus";
 import Panier from "./pages/Panier";
@@ -25,6 +25,8 @@ import Suivi from "./pages/admin/Suivi";
 import Formations from "./pages/Formations";
 import FormationVente from "./pages/FormationVente";
 import FastFood from "./pages/FastFood";
+import Liquidation from "./pages/Liquidation";
+import Livraisons from "./pages/Livraisons";
 import Auth from "./pages/Auth";
 import Suppliers from "./pages/Suppliers";
 import SupplierDetails from "./pages/SupplierDetails";
@@ -63,6 +65,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminVoyages from "./pages/admin/AdminVoyages";
 import AdminFastFood from "./pages/admin/AdminFastFood";
+import AdminLiquidation from "./pages/admin/AdminLiquidation";
 import AdminApplications from "./pages/admin/AdminApplications";
 import AdminServiceRequests from "./pages/admin/AdminServiceRequests";
 const queryClient = new QueryClient();
@@ -93,9 +96,11 @@ const App = () => (
                 <Route path="service-requests" element={<AdminServiceRequests />} />
                 <Route path="paiements" element={<AdminPayments />} />
                 <Route path="voyages" element={<AdminVoyages />} />
+                <Route path="liquidation" element={<AdminLiquidation />} />
                 <Route path="utilisateurs" element={<AdminUsers />} />
                 <Route path="orders" element={<AdminOrders />} />
-                <Route path="admin-partners" element={<AdminPartners />} />
+                <Route path="admin-partners" element={<AdminSuppliers />} />
+                <Route path="fournisseurs" element={<AdminSuppliers />} />
               </Route>
 
               <Route
@@ -187,6 +192,8 @@ const App = () => (
                         <Route path="/formations" element={<Formations />} />
                         <Route path="/formation-vente" element={<FormationVente />} />
                         <Route path="/fast-food" element={<FastFood />} />
+                        <Route path="/liquidation" element={<Liquidation />} />
+                        <Route path="/livraisons" element={<Livraisons />} />
                         <Route path="/auth" element={<Auth />} />
                         <Route path="/restaurant/:slug" element={<RestaurantPage />} />
                         <Route path="/suppliers" element={<Suppliers />} />

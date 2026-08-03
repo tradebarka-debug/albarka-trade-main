@@ -1,207 +1,266 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
+type RestaurantPartnerRow = {
+  id: string;
+  name: string | null;
+  slug: string | null;
+  image_url: string | null;
+  description: string | null;
+  location: string | null;
+  hours: string | null;
+  telephone: string | null;
+  category: string | null;
+  country: string | null;
+  country_id: number | null;
+  is_active: boolean | null;
+  sort_order: number | null;
+};
 
+const defaultForm = {
+  name: "",
+  slug: "",
+  image_url: "",
+  description: "",
+  location: "",
+  hours: "",
+  telephone: "",
+  category: "Restaurant",
+  country: "Burkina Faso",
+  country_id: 1,
+  is_active: true,
+  sort_order: 0,
+};
 
-const Adminrestaurant_partners = () => {
-  const [restaurant_partners, setrestaurant_partners] = useState([]);
-  const [editing, setEditing] = useState<string | null>(null);
-  const startEditing = (restaurant: any) => {
-    console.log("modifier cliqué", restaurant);
-    setEditing(restaurant.id);
-    setName(restaurant.name);
-    setSlug(restaurant.slug);
-    setImageUrl(restaurant.image_url);
-    setDescription(restaurant.description);
+const AdminRestaurants = () => {
+  const [restaurants, setRestaurants] = useState<RestaurantPartnerRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(defaultForm);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const loadRestaurants = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("restaurant_partners")
+      .select("*")
+      .order("sort_order", { ascending: true, nullsFirst: false });
+
+    if (error) {
+      console.error(error);
+      toast.error("Impossible de charger les restaurants partenaires");
+      setLoading(false);
+      return;
+    }
+
+    setRestaurants((data as RestaurantPartnerRow[]) || []);
+    setLoading(false);
   };
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [description, setDescription] = useState("");
+
   useEffect(() => {
-    fetchRestaurants();
+    loadRestaurants();
   }, []);
 
-  const fetchRestaurants = async () => {
-    const { data, error } = await supabase
-      .from("restaurant_partners" as any)
-      .select("*");
-    console.log("error=", error);
-    console.log("Restaurants chargés=", data);
-
-    if (error) {
-      console.log("error=", error);
-    } else {
-      setrestaurant_partners(data || []);
-      console.log(data);
-    }
+  const openCreate = () => {
+    setEditingId(null);
+    setForm({ ...defaultForm, country_id: Number(localStorage.getItem("country_id") || 1) });
+    setDialogOpen(true);
   };
-  const addRestaurant = async () => {
-    if (!imageUrl) {
-      alert("veuillez saisir une image URL");
+
+  const openEdit = (restaurant: RestaurantPartnerRow) => {
+    setEditingId(restaurant.id);
+    setForm({
+      name: restaurant.name || "",
+      slug: restaurant.slug || "",
+      image_url: restaurant.image_url || "",
+      description: restaurant.description || "",
+      location: restaurant.location || "",
+      hours: restaurant.hours || "",
+      telephone: restaurant.telephone || "",
+      category: restaurant.category || "Restaurant",
+      country: restaurant.country || "Burkina Faso",
+      country_id: restaurant.country_id || Number(localStorage.getItem("country_id") || 1),
+      is_active: restaurant.is_active ?? true,
+      sort_order: restaurant.sort_order ?? 0,
+    });
+    setDialogOpen(true);
+  };
+
+  const saveRestaurant = async () => {
+    if (!form.name.trim()) {
+      toast.error("Le nom du restaurant est obligatoire");
       return;
     }
-    if (editing) {
-      const { error } = await supabase
-        .from("restaurant_partners" as any)
-        .update({
-          name,
-          slug,
-          image_url: imageUrl,
-          description,
-        })
-        .eq("id", editing);
 
-      if (!error) {
-        fetchRestaurants();
-        setEditing(null);
-        setName("");
-        setSlug("");
-        setImageUrl("");
-        setDescription("");
+    const payload = {
+      name: form.name.trim(),
+      slug: form.slug.trim() || form.name.trim().toLowerCase().replace(/\s+/g, "-"),
+      image_url: form.image_url.trim(),
+      description: form.description.trim(),
+      location: form.location.trim(),
+      hours: form.hours.trim(),
+      telephone: form.telephone.trim(),
+      category: form.category.trim(),
+      country: form.country.trim(),
+      country_id: Number(form.country_id),
+      is_active: form.is_active,
+      sort_order: Number(form.sort_order),
+    };
+
+    if (editingId) {
+      const { error } = await supabase.from("restaurant_partners").update(payload).eq("id", editingId);
+      if (error) {
+        console.error(error);
+        toast.error("Erreur lors de la modification");
+        return;
       }
-
-      return;
-    }
-    const { error } = await supabase
-      .from("restaurant_partners" as any)
-      .insert([
-        {
-          name,
-          slug,
-          image_url: imageUrl,
-          description,
-          is_active: true,
-        },
-      ]);
-    console.log("Ajout lancé");
-
-    if (error) {
-      console.log(error);
+      toast.success("Restaurant modifié");
     } else {
-      fetchRestaurants();
-
-      setName("");
-      setSlug("");
-      setImageUrl("");
-      setDescription("");
+      const { error } = await supabase.from("restaurant_partners").insert(payload);
+      if (error) {
+        console.error(error);
+        toast.error("Erreur lors de l’ajout");
+        return;
+      }
+      toast.success("Restaurant ajouté");
     }
-  };
-  const deleteRestaurant = async (id: string) => {
-    const confirmDelete = window.confirm(
-      "Supprimer ce restaurant ?"
-    );
 
+    setDialogOpen(false);
+    setEditingId(null);
+    setForm({ ...defaultForm, country_id: Number(localStorage.getItem("country_id") || 1) });
+    loadRestaurants();
+  };
+
+  const deleteRestaurant = async (id: string) => {
+    const confirmDelete = window.confirm("Supprimer ce restaurant partenaire ?");
     if (!confirmDelete) return;
 
-    const result = await supabase
-      .from("restaurant_partners" as any)
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("restaurant_partners").delete().eq("id", id);
+    if (error) {
+      console.error(error);
+      toast.error("Suppression impossible");
+      return;
+    }
 
-
-    fetchRestaurants();
+    toast.success("Restaurant supprimé");
+    loadRestaurants();
   };
+
   return (
     <div className="p-6 md:p-8 space-y-6">
-      <div className="bg-zinc-900 p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-4">
-          restaurant_partners
-        </h2>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Restaurants partenaires</CardTitle>
+            <p className="text-sm text-muted-foreground">{restaurants.length} restaurant(s) référencé(s)</p>
+          </div>
+          <Button onClick={openCreate}>Ajouter un restaurant</Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-muted-foreground">Chargement...</p>
+          ) : (
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {restaurants.map((restaurant) => (
+                <div key={restaurant.id} className="rounded-xl border bg-card p-4 space-y-3">
+                  {restaurant.image_url && (
+                    <img src={restaurant.image_url} alt={restaurant.name || "Restaurant"} className="h-40 w-full rounded-lg object-cover" />
+                  )}
+                  <div>
+                    <h3 className="font-bold text-lg">{restaurant.name}</h3>
+                    <p className="text-sm text-muted-foreground">{restaurant.location}</p>
+                  </div>
+                  <p className="text-sm line-clamp-3">{restaurant.description}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs rounded-full bg-muted px-2 py-1">{restaurant.country}</span>
+                    <span className="text-xs rounded-full bg-muted px-2 py-1">{restaurant.is_active ? "Actif" : "Inactif"}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => openEdit(restaurant)}>Modifier</Button>
+                    <Button variant="destructive" size="sm" onClick={() => deleteRestaurant(restaurant.id)}>Supprimer</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        <input
-          type="text"
-          placeholder="Nom"
-          className="w-full p-3 rounded mb-3 text-black"
-          value={name}
-          onChange={(e) => {
-            const value = e.target.value;
-            setName(value);
-            setSlug(
-              value
-                .toLowerCase()
-                .replace(/\s+/g, "-")
-            );
-          }}
-        />
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Modifier le restaurant" : "Ajouter un restaurant"}</DialogTitle>
+          </DialogHeader>
 
-        <input
-          type="text"
-          placeholder="Slug"
-          className="w-full p-3 rounded mb-3 text-black"
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-        />
-
-        <input
-          type="text"
-          placeholder="Image URL"
-          className="w-full p-3 rounded mb-3 text-black"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-        />
-
-        <textarea
-          placeholder="Description"
-          className="w-full p-3 rounded mb-3 text-black"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-
-        <button
-          className="bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold"
-          onClick={addRestaurant}
-        >
-          {editing ? "Modifier" : "Ajouter"}
-        </button>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        {restaurant_partners.map((restaurant_partners: any, index) => (
-          <div
-            key={index}
-            className="bg-zinc-900 rounded-2xl overflow-hidden"
-          >
-            {restaurant_partners.image_url && (
-              <img
-                src={restaurant_partners.image_url}
-                alt={restaurant_partners.name}
-                className="w-full h-52 object-cover"
-              />
-            )}
-
-            <div className="p-4">
-              <h3 className="text-2xl font-bold">
-                {restaurant_partners.name}
-              </h3>
-
-              <p className="text-yellow-400 mt-2">
-                {restaurant_partners.description}
-              </p>
-
-              <div className="flex gap-2 mt-4">
-                <button
-                  className="bg-blue-500 text-white px-3 py-2 rounded"
-                  onClick={() => startEditing(restaurant_partners)}
-                >
-                  Modifier
-                </button>
-
-                <button
-                  className="bg-red-500 text-white px-3 py-2 rounded"
-                  onClick={() =>
-                    deleteRestaurant(restaurant_partners.id)
-                  }
-                >
-                  Supprimer
-                </button>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Nom *</Label>
+              <Input value={form.name} onChange={(e) => {
+                const value = e.target.value;
+                setForm({ ...form, name: value, slug: value.toLowerCase().replace(/\s+/g, "-") });
+              }} />
+            </div>
+            <div className="space-y-2">
+              <Label>Slug</Label>
+              <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Catégorie</Label>
+              <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Adresse / localité</Label>
+              <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Téléphone</Label>
+              <Input value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Heures</Label>
+              <Input value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Pays</Label>
+              <Input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Ordre affichage</Label>
+              <Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Image URL</Label>
+              <Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Description</Label>
+              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} />
+            </div>
+            <div className="space-y-2 md:col-span-2 flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <Label>Visible côté public</Label>
+                <p className="text-sm text-muted-foreground">Ce restaurant sera affiché sur la page public</p>
               </div>
+              <Switch checked={form.is_active} onCheckedChange={(checked) => setForm({ ...form, is_active: checked })} />
             </div>
           </div>
-        ))}
-      </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            <Button onClick={saveRestaurant}>Sauvegarder</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-export default Adminrestaurant_partners;
+export default AdminRestaurants;

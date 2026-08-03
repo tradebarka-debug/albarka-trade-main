@@ -6,7 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Phone, Mail, MapPin, Clock, Send, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import emailjs from "@emailjs/browser";
+
 const Contact = () => {
+  const countryId = Number(localStorage.getItem("country_id")) || 1;
+  const isBurkina = countryId === 1;
+  const phone = isBurkina ? "+226 02 02 94 94" : "+225 07 14 14 66 30";
+  const whatsapp = isBurkina ? "22602029494" : "2250714146630";
+  const address = isBurkina ? "Ouagadougou, Burkina Faso" : "Abidjan, Côte d'Ivoire";
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -92,7 +99,7 @@ const Contact = () => {
 
               <div className="space-y-4">
                 <a
-                  href="tel:+22602029494"
+                  href={`tel:${whatsapp}`}
                   className="flex items-start gap-4 p-4 bg-card rounded-xl border border-border card-hover"
                 >
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -100,13 +107,13 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold">Téléphone</h3>
-                    <p className="text-muted-foreground">+226 02 02 94 94</p>
+                    <p className="text-muted-foreground">{phone}</p>
                     <p className="text-sm text-primary mt-1">Appeler maintenant →</p>
                   </div>
                 </a>
 
                 <a
-                  href="https://wa.me/22602029494"
+                  href={`https://wa.me/${whatsapp}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-start gap-4 p-4 bg-card rounded-xl border border-border card-hover"
@@ -116,7 +123,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold">WhatsApp</h3>
-                    <p className="text-muted-foreground">+226 02 02 94 94</p>
+                    <p className="text-muted-foreground">{phone}</p>
                     <p className="text-sm text-emerald mt-1">Écrire sur WhatsApp →</p>
                   </div>
                 </a>
@@ -141,7 +148,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold">Adresse</h3>
-                    <p className="text-muted-foreground">Ouagadougou, Burkina Faso</p>
+                    <p className="text-muted-foreground">{address}</p>
                   </div>
                 </div>
 

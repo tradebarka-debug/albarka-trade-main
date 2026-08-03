@@ -4,9 +4,7 @@ import fastFoodImage from "@/assets/hero-fastfood-new.jpeg";
 import logoHalal from "@/assets/logo-halal.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { isBurkina, isCoteIvoire } from "@/data/country";
-const selectedCountry = Number(localStorage.getItem("country_id")) || 1;
+import { Link, useNavigate } from "react-router-dom";
 
 const restaurantsData = [
   {
@@ -89,21 +87,53 @@ const FastFoodSection = () => {
   const [restaurants, setRestaurants] = useState(restaurantsData);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollLeft = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({
-        left: -400,
-        behavior: "smooth",
-      });
+  const autoScrollTimerRef = useRef<number | null>(null);
+
+  const stopAutoScroll = () => {
+    if (autoScrollTimerRef.current !== null) {
+      window.clearInterval(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = null;
     }
   };
+
+  const startAutoScroll = () => {
+    if (autoScrollTimerRef.current !== null) return;
+
+    const container = scrollRef.current;
+    if (!container) return;
+
+    autoScrollTimerRef.current = window.setInterval(() => {
+      const maxScroll = container.scrollWidth - container.clientWidth;
+
+      if (container.scrollLeft >= maxScroll) {
+        container.scrollLeft = 0;
+      } else {
+        container.scrollLeft += 1;
+      }
+    }, 40);
+  };
+
+  const scrollLeft = () => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    stopAutoScroll();
+    container.scrollBy({
+      left: -Math.max(container.clientWidth * 0.9, 260),
+      behavior: "smooth",
+    });
+    window.setTimeout(startAutoScroll, 1200);
+  };
   const scrollRight = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({
-        left: 400,
-        behavior: "smooth",
-      });
-    }
+    const container = scrollRef.current;
+    if (!container) return;
+
+    stopAutoScroll();
+    container.scrollBy({
+      left: Math.max(container.clientWidth * 0.9, 260),
+      behavior: "smooth",
+    });
+    window.setTimeout(startAutoScroll, 1200);
   };
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -124,22 +154,11 @@ const FastFoodSection = () => {
     fetchRestaurants();
   }, [selectedCountry]);
   useEffect(() => {
-    const container = scrollRef.current;
+    startAutoScroll();
 
-    if (!container) return;
-
-    const interval = setInterval(() => {
-      const maxScroll =
-        container.scrollWidth - container.clientWidth;
-
-      if (container.scrollLeft >= maxScroll) {
-        container.scrollLeft = 0;
-      } else {
-        container.scrollLeft += 1;
-      }
-    }, 40);
-
-    return () => clearInterval(interval);
+    return () => {
+      stopAutoScroll();
+    };
   }, [restaurants]);
 
   if (loading) {
@@ -148,19 +167,6 @@ const FastFoodSection = () => {
 
   return (
   <>
-    <select
-      value={selectedCountry}
-      onChange={(e) => {
-  const value = Number(e.target.value);
-  setSelectedCountry(value);
-  localStorage.setItem("country_id", value.toString());
-}}
-      className="w-full p-3 rounded text-black mb-4"
-    >
-      <option value={1}>🇧🇫 Burkina Faso</option>
-      <option value={2}>🇨🇮 Côte d'Ivoire</option>
-    </select>
-
     <section className="section-padding bg-background">
       <div className="container mx-auto">
         {/* Section Header */}
@@ -176,6 +182,15 @@ const FastFoodSection = () => {
             Decouvrez nos meilleurs restaurants partenaires
           </p>
         </div>
+        <div className="flex justify-center -mt-2 mb-6">
+          <Link
+            to="/restaurant/delice"
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition hover:opacity-90"
+          >
+            Découvrir nos restaurants partenaires
+          </Link>
+        </div>
+
         <div className="hidden md:flex justify-between items-center px-8 mb-2">
           <button
             onClick={scrollLeft}
@@ -228,6 +243,7 @@ const FastFoodSection = () => {
             </a>
           ))}
         </div>
+
       </div>
     </section>
   </>

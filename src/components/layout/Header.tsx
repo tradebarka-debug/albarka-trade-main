@@ -11,6 +11,9 @@ import CountryDropdown from "@/components/CountryDropdown";
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const countryId = Number(localStorage.getItem("country_id")) || 1;
+  const phoneNumber = countryId === 2 ? "+225 07 14 14 66 30" : "+226 02 02 94 94";
+  const phoneHref = countryId === 2 ? "tel:+2250714146630" : "tel:+22602029494";
   const {
     totalItems
   } = useCart();
@@ -79,9 +82,9 @@ const Header = () => {
           <div className="hidden md:block">
             <CountryDropdown />
           </div>
-          <a href="tel:+22602029494" className="hidden md:flex items-center gap-2 text-xs whitespace-nowrap text-muted-foreground hover:text-primary transition-colors">
+          <a href={phoneHref} className="hidden md:flex items-center gap-2 text-xs whitespace-nowrap text-muted-foreground hover:text-primary transition-colors">
             <Phone className="w-4 h-4" />
-            <span>+226 02 02 94 94</span>
+            <span>{phoneNumber}</span>
           </a>
 
           <Link to="/panier" className="relative">
@@ -161,9 +164,9 @@ const Header = () => {
             Connexion
           </Link>}
 
-          <a href="tel:+22602029494" className="flex items-center gap-2 px-4 py-3 text-base text-muted-foreground hover:text-primary transition-colors">
+          <a href={phoneHref} className="flex items-center gap-2 px-4 py-3 text-base text-muted-foreground hover:text-primary transition-colors">
             <Phone className="w-5 h-5" />
-            <span>+226 02 02 94 94</span>
+            <span>{phoneNumber}</span>
           </a>
         </div>
       </nav>}

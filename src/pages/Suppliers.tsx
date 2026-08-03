@@ -130,16 +130,6 @@ const Suppliers = () => {
                         Liquidation
                     </button>
                     <button
-                        onClick={() => setSelectedCategory("Restaurants")}
-                        className={
-                            selectedCategory === "Restaurants"
-                                ? "bg-yellow-500 text-black px-4 py-2 rounded-lg font-bold"
-                                : "bg-gray-800 text-white px-4 py-1.5 rounded-lg hover:bg-gray-700"
-                        }
-                    >
-                        Restaurants
-                    </button>
-                    <button
                         onClick={() => navigate("/fast-food")}
                         className={
                             selectedCategory === "Fast Food"
@@ -175,7 +165,7 @@ const Suppliers = () => {
                     return (
                         <div
                             key={supplier.id}
-                            onClick={() => navigate(`/supplier/${supplier.id}`)}
+                            onClick={() => navigate(`/suppliers/${supplier.id}`)}
                             className="bg-[#1f1f1f] rounded-2xl overflow-hidden shadow-lg cursor-pointer hover:scale-105 transition"
                         >
                             <img

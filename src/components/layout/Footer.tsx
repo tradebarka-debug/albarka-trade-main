@@ -1,22 +1,24 @@
 import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin, Facebook, MessageCircle, Clock, Globe } from "lucide-react";
-import logoAlbarka from "@/assets/logo-albarka.jpeg"; const countryId = Number(localStorage.getItem("country_id")) || 1;
+import logoAlbarka from "@/assets/logo-albarka.jpeg";
 
-const locationText =
-  countryId === 2
-    ? "Basé en Côte d'Ivoire, nous servons l'Afrique de l'Ouest avec excellence et engagement."
-    : "Basé au Burkina Faso, nous servons l'Afrique de l'Ouest avec excellence et engagement.";
-
-const address =
-  countryId === 2
-    ? "Abidjan, Côte d'Ivoire"
-    : "Ouagadougou, Burkina Faso";
-
-const phone =
-  countryId === 2
-    ? "+225 07 14 14 66 30"
-    : "+226 02 02 94 94";
 const Footer = () => {
+  const countryId = Number(localStorage.getItem("country_id")) || 1;
+
+  const locationText =
+    countryId === 2
+      ? "Basé en Côte d'Ivoire, nous servons l'Afrique de l'Ouest avec excellence et engagement."
+      : "Basé au Burkina Faso, nous servons l'Afrique de l'Ouest avec excellence et engagement.";
+
+  const address =
+    countryId === 2
+      ? "Abidjan, Côte d'Ivoire"
+      : "Ouagadougou, Burkina Faso";
+
+  const phone =
+    countryId === 2
+      ? "+225 07 14 14 66 30"
+      : "+226 02 02 94 94";
 
   return <footer className="bg-gradient-to-b from-[#1a1a2e] to-[#16213e] text-white">
     {/* Top Section with Logo */}

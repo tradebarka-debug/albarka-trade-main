@@ -28,7 +28,8 @@ const menuItems = [
   { path: "/admin/emplois", label: "Offres d'emploi", icon: Briefcase },
   { path: "/admin/paiements", label: "Paiements", icon: CreditCard },
   { path: "/admin/orders", label: "Commandes", icon: Package },
-  { path: "/admin/admin-partners", label: "Partenaires", icon: Users },
+  { path: "/admin/liquidation", label: "Liquidation", icon: Package },
+  { path: "/admin/admin-partners", label: "Fournisseurs", icon: Users },
   { path: "/admin/voyages", label: "Voyages & Courriers", icon: Bus },
   { path: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
 ];

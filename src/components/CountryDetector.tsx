@@ -46,9 +46,10 @@ const CountryDetector = () => {
         }
 
         if (!localStorage.getItem("country_id")) {
-  localStorage.setItem("country_id", countryId.toString());
-}
-     })
+          localStorage.setItem("country_id", countryId.toString());
+          window.dispatchEvent(new CustomEvent("country-changed"));
+        }
+      })
       .catch(console.error);
   }, []);
 

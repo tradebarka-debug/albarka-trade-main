@@ -2,11 +2,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Phone, Mail, MapPin, MessageCircle, FileText } from "lucide-react";
 
-const isBurkina = Number(localStorage.getItem("country_id") || "1") === 1;
-const isCoteIvoire = Number(localStorage.getItem("country_id") || "1") === 2;
-const countryName = isBurkina ? "Burkina Faso" : "Côte d'Ivoire";
-
 const CTASection = () => {
+  const countryId = Number(localStorage.getItem("country_id") || "1");
+  const isBurkina = countryId === 1;
+  const isCoteIvoire = countryId === 2;
+  const countryName = isBurkina ? "Burkina Faso" : "Côte d'Ivoire";
+
   return (
     <section className="section-padding">
       <div className="container mx-auto">
