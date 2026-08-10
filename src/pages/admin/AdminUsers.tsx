@@ -44,6 +44,27 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Users, Loader2, Shield, User } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+type UserRole =
+  | "admin"
+  | "restaurant"
+  | "alimentaire"
+  | "livreur"
+  | "client"
+  | "representant"
+  | "commercial"
+  | "agency"
+  | "partner"
+  | "transport_pdg"
+  | "transport_station_manager"
+  | "transport_courier_manager"
+  | "transport_accountant"
+  | "transport_driver"
+  | "transport_agent"
+  | "transport_cashier"
+  | "transport_controller"
+  | "transport_baggage_agent"
+  | "transport_baggage_controller"
+  | "transport_staff";
 
 interface UserData {
   id: string;
@@ -51,14 +72,20 @@ interface UserData {
   full_name: string;
   created_at: string;
   last_sign_in_at: string | null;
-  role: "admin" | "user";
+  role: UserRole;
+  organization_id: number | null;
+  organization_name: string | null;
+  organization_role_id: number | null;
+  organization_role_name: string | null;
 }
 
 interface UserFormData {
   email: string;
   password: string;
   full_name: string;
-  role: "admin" | "user";
+  role: UserRole;
+  organization_id: number | null;
+  organization_role_id: number | null;
 }
 
 const AdminUsers = () => {
@@ -73,7 +100,9 @@ const AdminUsers = () => {
     email: "",
     password: "",
     full_name: "",
-    role: "user",
+    role: "client",
+    organization_id: null,
+    organization_role_id: null,
   });
 
   const fetchUsers = async () => {
@@ -107,7 +136,9 @@ const AdminUsers = () => {
       email: "",
       password: "",
       full_name: "",
-      role: "user",
+      role: "client",
+      organization_id: null,
+      organization_role_id: null,
     });
     setEditingUser(null);
   };
@@ -124,6 +155,8 @@ const AdminUsers = () => {
       password: "",
       full_name: user.full_name,
       role: user.role,
+      organization_id: user.organization_id,
+      organization_role_id: user.organization_role_id,
     });
     setIsDialogOpen(true);
   };
@@ -143,6 +176,8 @@ const AdminUsers = () => {
             password: formData.password || undefined,
             full_name: formData.full_name,
             role: formData.role,
+            organization_id: formData.organization_id,
+            organization_role_id: formData.organization_role_id,
           },
         });
 
@@ -293,26 +328,42 @@ const AdminUsers = () => {
                   <Label htmlFor="role">Rôle</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value: "admin" | "user") =>
+                    onValueChange={(value: UserFormData["role"]) =>
                       setFormData({ ...formData, role: value })
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner un rôle" />
                     </SelectTrigger>
+
                     <SelectContent>
-                      <SelectItem value="user">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          Utilisateur
-                        </div>
-                      </SelectItem>
                       <SelectItem value="admin">
                         <div className="flex items-center gap-2">
                           <Shield className="w-4 h-4" />
                           Administrateur
                         </div>
                       </SelectItem>
+
+                      <SelectItem value="restaurant">Restaurant</SelectItem>
+                      <SelectItem value="alimentaire">Alimentaire</SelectItem>
+                      <SelectItem value="livreur">Livreur</SelectItem>
+                      <SelectItem value="client">Client</SelectItem>
+                      <SelectItem value="representant">Représentant</SelectItem>
+                      <SelectItem value="commercial">Commercial</SelectItem>
+                      <SelectItem value="agency">Agence</SelectItem>
+                      <SelectItem value="partner">Partenaire</SelectItem>
+
+                      <SelectItem value="transport_pdg">PDG / Direction transport</SelectItem>
+                      <SelectItem value="transport_station_manager">Chef de gare</SelectItem>
+                      <SelectItem value="transport_courier_manager">Responsable service courrier</SelectItem>
+                      <SelectItem value="transport_accountant">Comptable</SelectItem>
+                      <SelectItem value="transport_driver">Chauffeur</SelectItem>
+                      <SelectItem value="transport_agent">Agent de transport</SelectItem>
+                      <SelectItem value="transport_cashier">Caissier / Billetterie</SelectItem>
+                      <SelectItem value="transport_controller">Contrôleur voyageurs</SelectItem>
+                      <SelectItem value="transport_baggage_agent">Bagagiste</SelectItem>
+                      <SelectItem value="transport_baggage_controller">Contrôleur des bagages</SelectItem>
+                      <SelectItem value="transport_staff">Personnel transport</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -369,7 +420,7 @@ const AdminUsers = () => {
             <div>
               <p className="text-sm text-muted-foreground">Utilisateurs standards</p>
               <p className="text-2xl font-bold">
-                {users.filter((u) => u.role === "user").length}
+                {users.filter((u) => u.role === "client").length}
               </p>
             </div>
           </div>
@@ -420,7 +471,14 @@ const AdminUsers = () => {
                       ) : (
                         <User className="w-3 h-3" />
                       )}
-                      {user.role === "admin" ? "Admin" : "Utilisateur"}
+
+                      {user.organization_role_name
+                        ? user.organization_role_name
+                        : user.role === "transport_pdg"
+                          ? "PDG / Direction transport"
+                          : user.role === "admin"
+                            ? "Admin"
+                            : "Utilisateur"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -431,8 +489,8 @@ const AdminUsers = () => {
                   <TableCell>
                     {user.last_sign_in_at
                       ? format(new Date(user.last_sign_in_at), "dd MMM yyyy HH:mm", {
-                          locale: fr,
-                        })
+                        locale: fr,
+                      })
                       : "Jamais"}
                   </TableCell>
                   <TableCell className="text-right">

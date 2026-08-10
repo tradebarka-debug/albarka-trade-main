@@ -34,12 +34,12 @@ const Suppliers = () => {
     const loadSuppliers = async () => {
         const selectedcountry =
             Number(localStorage.getItem("country_id")) || 1;
-            console.log("country_id =", selectedcountry);
+        console.log("country_id =", selectedcountry);
 
         const { data, error } = await (supabase as any)
             .from("suppliers")
             .select("*")
-            .eq("country_id", selectedcountry);
+            .eq("visibility", "international");
 
         const { data: productsData, error: productsError } = await (supabase as any)
             .from("products")
@@ -48,10 +48,10 @@ const Suppliers = () => {
 
 
         setProducts(productsData || []);
-       
+
         if (!error) {
             setSuppliers(data || []);
-           
+
         }
     };
     const getFlag = (Country: string) => {
@@ -178,7 +178,11 @@ const Suppliers = () => {
                                 <h2 className="text-2xl font-bold text-white">
                                     {supplier.company_name}
                                 </h2>
-
+                                {supplier.certified && (
+                                    <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400">
+                                        ✓ Fournisseur certifié
+                                    </span>
+                                )}
                                 <p className="text-yellow-400 mt-1">
                                     {getFlag(supplier.country)} {supplier.country}
                                 </p>

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,7 @@ const defaultForm = {
   description: "",
   logo: "",
   status: "active",
+  certified: false,
   country_id: 1,
 };
 
@@ -39,6 +41,7 @@ type SupplierRow = {
   description: string | null;
   logo: string | null;
   status: string | null;
+  certified: boolean | null;
   country_id: number | null;
 };
 
@@ -48,6 +51,9 @@ const AdminSuppliers = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<SupplierForm>(defaultForm);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadSuppliers = async () => {
     setLoading(true);
@@ -63,7 +69,7 @@ const AdminSuppliers = () => {
       return;
     }
 
-    setSuppliers((data as SupplierRow[]) || []);
+    setSuppliers((data as unknown as SupplierRow[]) || []);
     setLoading(false);
   };
 
@@ -91,6 +97,7 @@ const AdminSuppliers = () => {
       description: supplier.description || "",
       logo: supplier.logo || "",
       status: supplier.status || "active",
+      certified: supplier.certified ?? false,
       country_id: supplier.country_id || Number(localStorage.getItem("country_id") || 1),
     });
     setDialogOpen(true);
@@ -104,7 +111,7 @@ const AdminSuppliers = () => {
 
     const payload = {
       company_name: form.company_name.trim(),
-      category: form.category.trim(),
+      category: "Fournisseur",
       country: form.country.trim(),
       city: form.city.trim(),
       email: form.email.trim(),
@@ -114,7 +121,8 @@ const AdminSuppliers = () => {
       description: form.description.trim(),
       logo: form.logo.trim(),
       status: form.status.trim(),
-      country_id: Number(form.country_id),
+      certified: Boolean(form.certified),
+
     };
 
     if (editingId) {
@@ -195,7 +203,17 @@ const AdminSuppliers = () => {
                         <div>{supplier.email}</div>
                         <div>{supplier.whatsapp}</div>
                       </td>
-                      <td className="p-2">{supplier.status}</td>
+                      <td>
+                        <div className="flex flex-col gap-1">
+                          <span>{supplier.status}</span>
+
+                          {supplier.certified && (
+                            <span className="text-yellow-400 font-semibold">
+                              ✓ Certifié
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-2 text-right space-x-2">
                         <Button variant="outline" size="sm" onClick={() => openEdit(supplier)}>Modifier</Button>
                         <Button variant="destructive" size="sm" onClick={() => deleteSupplier(supplier.id)}>Supprimer</Button>
@@ -249,8 +267,68 @@ const AdminSuppliers = () => {
               <Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>Logo URL</Label>
-              <Input value={form.logo} onChange={(e) => setForm({ ...form, logo: e.target.value })} />
+              <Label>Logo du fournisseur</Label>
+
+              {imagePreview ? (
+                <div className="relative w-32 h-32 rounded-lg overflow-hidden border">
+                  <img
+                    src={imagePreview}
+                    alt="Logo"
+                    className="w-full h-full object-contain bg-white"
+                  />
+
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreview(null);
+                      setForm({ ...form, logo: "" });
+
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-32 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary"
+                >
+                  <ImageIcon className="w-10 h-10 mb-3 text-muted-foreground" />
+                  <p>Sélectionner un logo</p>
+                  <p className="text-xs text-muted-foreground">
+                    JPG • PNG • WEBP (5 Mo max)
+                  </p>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+
+                  if (!file) return;
+
+                  setImageFile(file);
+
+                  const reader = new FileReader();
+
+                  reader.onloadend = () => {
+                    setImagePreview(reader.result as string);
+                  };
+
+                  reader.readAsDataURL(file);
+                }}
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Description</Label>
@@ -260,14 +338,42 @@ const AdminSuppliers = () => {
               <div>
                 <Label>Statut public</Label>
                 <p className="text-sm text-muted-foreground">Visible sur la page fournisseurs</p>
+                <p className="text-sm">
+  TEST STATUT : {form.status}
+</p>
               </div>
-              <Switch checked={form.status === "active"} onCheckedChange={(checked) => setForm({ ...form, status: checked ? "active" : "inactive" })} />
+              <Switch
+  checked={form.status === "active"}
+  onCheckedChange={(checked) => {
+    console.log("STATUT :", checked ? "active" : "inactive");
+
+    setForm((prev) => ({
+      ...prev,
+      status: checked ? "active" : "inactive",
+    }));
+  }}
+/>
             </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div>
+              <p className="font-medium">Fournisseur certifié</p>
+              <p className="text-sm text-muted-foreground">
+                Afficher le badge certifié sur la page fournisseurs
+              </p>
+            </div>
+
+            <Switch
+              checked={form.certified}
+              onCheckedChange={(checked) =>
+                setForm({ ...form, certified: checked })
+              }
+            />
           </div>
 
           <div className="flex justify-end gap-2 mt-4">
             <div className="pb-8">
-        
+
             </div>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
             <Button onClick={saveSupplier}>Sauvegarder</Button>
