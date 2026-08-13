@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Plus, Pencil, Trash2, Search, Upload, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ const initialFormations: Formation[] = [
 ];
 
 const AdminFormations = () => {
-  const [formations, setFormations] = useState<Formation[]>(initialFormations);
+  const [formations, setFormations] = useState<Formation[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFormation, setEditingFormation] = useState<Formation | null>(null);
@@ -56,6 +56,14 @@ const AdminFormations = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const loadFormations = async () => {
+    const { data, error } = await supabase.from("formations").select("*").order("created_at", { ascending: false });
+    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
+    setFormations((data ?? []).map((formation: any) => ({ ...formation, duration: formation.duration ?? "", location: formation.location ?? "", price: Number(formation.price ?? 0) })));
+  };
+
+  useEffect(() => { void loadFormations(); }, []);
 
   const filteredFormations = formations.filter(formation =>
     formation.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -143,6 +151,18 @@ const AdminFormations = () => {
     setIsUploading(true);
 
     try {
+      {
+        const imageUrl = imageFile ? (await uploadImage(imageFile)) || undefined : editingFormation?.image_url;
+        const payload = { title: formData.title, duration: formData.duration, price: String(Number(formData.price)), location: formData.location, description: formData.description, image_url: imageUrl };
+        const { error } = editingFormation
+          ? await supabase.from("formations").update(payload as any).eq("id", editingFormation.id)
+          : await supabase.from("formations").insert(payload as any);
+        if (error) throw error;
+        toast({ title: editingFormation ? "Formation modifiée" : "Formation ajoutée" });
+        setIsDialogOpen(false);
+        await loadFormations();
+        return;
+      }
       let imageUrl = editingFormation?.image_url || undefined;
 
       if (imageFile) {
@@ -189,7 +209,12 @@ const AdminFormations = () => {
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
+    const { error } = await supabase.from("formations").delete().eq("id", id);
+    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Formation supprimée" });
+    await loadFormations();
+    return;
     setFormations(formations.filter(f => f.id !== id));
     toast({ title: "Formation supprimée", description: "La formation a été supprimée" });
   };

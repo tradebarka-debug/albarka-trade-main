@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
+  isTransportPDG: boolean;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
@@ -18,23 +19,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+const [isTransportPDG, setIsTransportPDG] = useState(false);
+const [isLoading, setIsLoading] = useState(true);
 
-  const checkAdminRole = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error checking admin role:', error);
-      return false;
-    }
-    
-    return !!data;
+ const checkUserRoles = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error checking user roles:', error);
+    return {
+      isAdmin: false,
+      isTransportPDG: false,
+    };
+  }
+
+  return {
+    isAdmin: data?.some((item) => item.role === 'admin') ?? false,
+    isTransportPDG: data?.some((item) => item.role === 'transport_pdg') ?? false,
+    isSalesAgent: data?.some((item) => item.role === 'sales_agent') ?? false,
   };
+};
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -46,7 +53,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Defer admin check with setTimeout to prevent deadlock
         if (session?.user) {
           setTimeout(() => {
-            checkAdminRole(session.user.id).then(setIsAdmin);
+            checkUserRoles(session.user.id).then((roles) => {
+              setIsAdmin(roles.isAdmin);
+              setIsTransportPDG(roles.isTransportPDG);
+             
+            });
           }, 0);
         } else {
           setIsAdmin(false);
@@ -62,7 +73,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        checkAdminRole(session.user.id).then(setIsAdmin);
+        checkUserRoles(session.user.id).then((roles) => {
+  setIsAdmin(roles.isAdmin);
+  setIsTransportPDG(roles.isTransportPDG);
+});
       }
       
       setIsLoading(false);
@@ -106,6 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         session,
         isAdmin,
+        isTransportPDG,
         isLoading,
         signIn,
         signUp,

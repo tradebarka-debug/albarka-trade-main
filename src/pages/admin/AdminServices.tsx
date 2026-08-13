@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Plus, Pencil, Trash2, Search, Upload, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ const initialServices: Service[] = [
 ];
 
 const AdminServices = () => {
-  const [services, setServices] = useState<Service[]>(initialServices);
+  const [services, setServices] = useState<Service[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -55,6 +55,14 @@ const AdminServices = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const loadServices = async () => {
+    const { data, error } = await supabase.from("services").select("*").order("created_at", { ascending: false });
+    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
+    setServices((data ?? []).map((service: any) => ({ ...service, name: service.title ?? "", category: service.category ?? "", status: service.status ?? "Actif" })));
+  };
+
+  useEffect(() => { void loadServices(); }, []);
 
   const filteredServices = services.filter(service =>
     service.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -141,6 +149,18 @@ const AdminServices = () => {
     setIsUploading(true);
 
     try {
+      {
+        const imageUrl = imageFile ? (await uploadImage(imageFile)) || undefined : editingService?.image_url;
+        const payload = { title: formData.name, category: formData.category, status: formData.status, description: formData.description, image_url: imageUrl };
+        const { error } = editingService
+          ? await supabase.from("services").update(payload as any).eq("id", editingService.id)
+          : await supabase.from("services").insert(payload as any);
+        if (error) throw error;
+        toast({ title: editingService ? "Service modifié" : "Service ajouté" });
+        setIsDialogOpen(false);
+        await loadServices();
+        return;
+      }
       let imageUrl = editingService?.image_url || undefined;
 
       if (imageFile) {
@@ -185,7 +205,12 @@ const AdminServices = () => {
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
+    const { error } = await supabase.from("services").delete().eq("id", id);
+    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Service supprimé" });
+    await loadServices();
+    return;
     setServices(services.filter(s => s.id !== id));
     toast({ title: "Service supprimé", description: "Le service a été supprimé" });
   };

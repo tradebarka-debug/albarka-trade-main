@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Plus, Pencil, Trash2, Search, Upload, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,7 @@ const initialJobs: Job[] = [
 ];
 
 const AdminJobs = () => {
-  const [jobs, setJobs] = useState<Job[]>(initialJobs);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -64,6 +64,14 @@ const AdminJobs = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const loadJobs = async () => {
+    const { data, error } = await supabase.from("jobs").select("*").order("created_at", { ascending: false });
+    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
+    setJobs((data ?? []).map((job: any) => ({ ...job, type: job.employment_type ?? "CDI", status: job.status ?? "Ouvert" })));
+  };
+
+  useEffect(() => { void loadJobs(); }, []);
 
   const filteredJobs = jobs.filter(job =>
     job.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -152,6 +160,18 @@ const AdminJobs = () => {
     setIsUploading(true);
 
     try {
+      {
+        const imageUrl = imageFile ? (await uploadImage(imageFile)) || undefined : editingJob?.image_url;
+        const payload = { title: formData.title, location: formData.location, employment_type: formData.type, status: formData.status, description: formData.description, requirements: formData.requirements, image_url: imageUrl };
+        const { error } = editingJob
+          ? await supabase.from("jobs").update(payload as any).eq("id", editingJob.id)
+          : await supabase.from("jobs").insert(payload as any);
+        if (error) throw error;
+        toast({ title: editingJob ? "Offre modifiée" : "Offre ajoutée" });
+        setIsDialogOpen(false);
+        await loadJobs();
+        return;
+      }
       let imageUrl = editingJob?.image_url || undefined;
 
       if (imageFile) {
@@ -198,7 +218,12 @@ const AdminJobs = () => {
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
+    const { error } = await supabase.from("jobs").delete().eq("id", id);
+    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Offre supprimée" });
+    await loadJobs();
+    return;
     setJobs(jobs.filter(j => j.id !== id));
     toast({ title: "Offre supprimée", description: "L'offre d'emploi a été supprimée" });
   };

@@ -1,216 +1,71 @@
-
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../integrations/supabase/client";
-import { useEffect, useState, useRef } from "react";
+
+type Supplier = { id: number; company_name: string | null; category: string | null; country: string | null; description: string | null; logo: string | null; certified: boolean };
+type Product = { id: number; supplier_id: number | null };
+const suppliersTable = supabase.from("suppliers") as any;
+
+const flags: Record<string, string> = {
+  "Burkina Faso": "🇧🇫", "Thaïlande": "🇹🇭", Chine: "🇨🇳", "Côte d'Ivoire": "🇨🇮",
+  Mali: "🇲🇱", Niger: "🇳🇪", Togo: "🇹🇬", Bénin: "🇧🇯", Ghana: "🇬🇭",
+};
 
 const Suppliers = () => {
-    const [suppliers, setSuppliers] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState("Tous");
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const navigate = useNavigate();
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("Tous");
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        loadSuppliers();
-    }, []);
-    useEffect(() => {
-        const container = scrollRef.current;
-
-        if (!container) return;
-
-        const interval = setInterval(() => {
-            const maxScroll =
-                container.scrollWidth - container.clientWidth;
-
-            if (container.scrollLeft >= maxScroll) {
-                container.scrollLeft = 0;
-            } else {
-                container.scrollLeft += 1;
-            }
-        }, 40);
-
-        return () => clearInterval(interval);
-    }, [suppliers]);
+  useEffect(() => {
     const loadSuppliers = async () => {
-        const selectedcountry =
-            Number(localStorage.getItem("country_id")) || 1;
-        console.log("country_id =", selectedcountry);
+      setLoading(true);
+      const [{ data: suppliersData, error: suppliersError }, { data: productsData, error: productsError }] = await Promise.all([
+        suppliersTable.select("id, company_name, category, country, description, logo, certified").eq("status", "active"),
+        supabase.from("products").select("id, supplier_id"),
+      ]);
 
-        const { data, error } = await (supabase as any)
-            .from("suppliers")
-            .select("*")
-            .eq("visibility", "international");
-
-        const { data: productsData, error: productsError } = await (supabase as any)
-            .from("products")
-            .select("*")
-            .eq("country_id", selectedcountry);
-
-
-        setProducts(productsData || []);
-
-        if (!error) {
-            setSuppliers(data || []);
-
-        }
+      if (suppliersError) console.error("Impossible de charger les fournisseurs", suppliersError);
+      if (productsError) console.error("Impossible de charger les produits", productsError);
+      setSuppliers(suppliersData ?? []);
+      setProducts(productsData ?? []);
+      setLoading(false);
     };
-    const getFlag = (Country: string) => {
-        switch (Country) {
-            case "Burkina Faso":
-                return "🇧🇫";
+    void loadSuppliers();
+  }, []);
 
-            case "Thaïlande":
-                return "🇹🇭";
+  const filteredSuppliers = useMemo(() => selectedCategory === "Tous" ? suppliers : suppliers.filter((supplier) => supplier.category === selectedCategory), [selectedCategory, suppliers]);
 
-            case "Chine":
-                return "🇨🇳";
-
-            case "Côte d'Ivoire":
-                return "🇨🇮";
-
-            case "Mali":
-                return "🇲🇱";
-
-            case "Niger":
-                return "🇳🇪";
-
-            case "Togo":
-                return "🇹🇬";
-
-            case "Bénin":
-                return "🇧🇯";
-
-            case "Ghana":
-                return "🇬🇭";
-        }
-    };
-
-    const filteredSuppliers =
-        selectedCategory === "Tous"
-            ? suppliers
-            : suppliers.filter((supplier: any) =>
-                supplier.category === selectedCategory
-            );
-
-    return (
-        <div className="container mx-auto py-10 px-4 overflow-x-hidden">
-            <div className="text-center mb-8">
-                <h1 className="text-2xl md:text-4xl font-bold text-white">
-                    Réseau de Partenaires
-
-                </h1>
-
-                <p className="text-gray-400 mt-2">
-                    Produits alimentaires, boissons, restauration, services et fournisseurs partenaires
-                </p>
-            </div>
-            <div className="flex justify-center mb-6">
-                <div className="inline-flex gap-3 bg-red-500 p-4 rounded-xl">
-                    <button
-                        onClick={() => setSelectedCategory("Tous")}
-                        className="bg-yellow-500 text-black px-4 py-2 rounded-lg"
-                    >
-                        Tous
-                    </button>
-
-                    <button
-                        onClick={() => setSelectedCategory("Fournisseurs")}
-                        className={
-                            selectedCategory === "Fournisseurs"
-                                ? "bg-yellow-500 text-black px-4 py-2 rounded-lg font-bold"
-                                : "bg-gray-800 text-white px-4 py-1.5 rounded-lg hover:bg-gray-700"
-                        }
-                    >
-                        Fournisseurs
-                    </button>
-                    <button
-                        onClick={() => navigate("/liquidation")}
-                        className="bg-gray-800 text-white px-3 py-2 rounded-lg hover:bg-gray-700 text-sm"
-                    >
-                        Liquidation
-                    </button>
-                    <button
-                        onClick={() => navigate("/fast-food")}
-                        className={
-                            selectedCategory === "Fast Food"
-                                ? "bg-yellow-500 text-black px-3 py-2 rounded-lg text-sm font-bold"
-                                : "bg-gray-800 text-white px-3 py-2 rounded-lg hover:bg-gray-700 text-sm"
-                        }
-                    >
-                        Fast Food
-                    </button>
-                    <button
-                        onClick={() => navigate("/voyages")}
-                        className="bg-gray-800 text-white px-3 py-2 rounded-lg hover:bg-gray-700 text-sm"
-                    >
-                        Compagnie de Voyages
-                    </button>
-                    <button
-                        onClick={() => navigate("/livraisons")}
-                        className="bg-gray-800 text-white px-3 py-2 rounded-lg hover:bg-gray-700 text-sm"
-                    >
-                        Livreurs
-                    </button>
-                </div>
-            </div>
-            <div
-                ref={scrollRef}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4 px-4"
-            >
-                {filteredSuppliers.map((supplier: any) => {
-                    const supplierProducts = products.filter(
-                        (product: any) => product.supplier_id === supplier.id
-                    );
-
-                    return (
-                        <div
-                            key={supplier.id}
-                            onClick={() => navigate(`/suppliers/${supplier.id}`)}
-                            className="bg-[#1f1f1f] rounded-2xl overflow-hidden shadow-lg cursor-pointer hover:scale-105 transition"
-                        >
-                            <img
-                                src={supplier.logo_url}
-                                alt={supplier.company_name}
-                                className="w-full h-56 object-cover"
-                            />
-
-                            <div className="p-4">
-                                <h2 className="text-2xl font-bold text-white">
-                                    {supplier.company_name}
-                                </h2>
-                                {supplier.certified && (
-                                    <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400">
-                                        ✓ Fournisseur certifié
-                                    </span>
-                                )}
-                                <p className="text-yellow-400 mt-1">
-                                    {getFlag(supplier.country)} {supplier.country}
-                                </p>
-
-                                <p className="text-gray-400 mt-2">
-                                    {supplier.category}
-                                </p>
-
-                                <p className="text-gray-300 mt-3 line-clamp-2">
-                                    {supplier.description}
-                                </p>
-
-                                <div className="mt-4 flex justify-between items-center">
-                                    <span className="text-yellow-400 font-semibold">
-                                        {supplierProducts.length} produits
-                                    </span>
-
-                                    <button className="bg-yellow-500 text-black px-4 py-2 rounded-lg">
-                                        Voir
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+  return (
+    <div className="container mx-auto overflow-x-hidden px-4 py-10">
+      <div className="mb-8 text-center">
+        <h1 className="text-2xl font-bold text-white md:text-4xl">Réseau de partenaires</h1>
+        <p className="mt-2 text-gray-400">Produits alimentaires, boissons, restauration, services et fournisseurs partenaires</p>
+      </div>
+      <div className="mb-6 flex justify-center">
+        <div className="inline-flex flex-wrap justify-center gap-3 rounded-xl bg-red-500 p-4">
+          <button onClick={() => setSelectedCategory("Tous")} className={selectedCategory === "Tous" ? "rounded-lg bg-yellow-500 px-4 py-2 font-bold text-black" : "rounded-lg bg-gray-800 px-4 py-2 text-white hover:bg-gray-700"}>Tous</button>
+          <button onClick={() => setSelectedCategory("Fournisseur")} className={selectedCategory === "Fournisseur" ? "rounded-lg bg-yellow-500 px-4 py-2 font-bold text-black" : "rounded-lg bg-gray-800 px-4 py-2 text-white hover:bg-gray-700"}>Fournisseurs</button>
+          <button onClick={() => navigate("/liquidation")} className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white hover:bg-gray-700">Liquidation</button>
+          <button onClick={() => navigate("/fast-food")} className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white hover:bg-gray-700">Fast Food</button>
+          <button onClick={() => navigate("/voyages")} className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white hover:bg-gray-700">Compagnie de voyages</button>
+          <button onClick={() => navigate("/livraisons")} className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white hover:bg-gray-700">Livreurs</button>
         </div>
-    );
+      </div>
+      {loading ? <p className="text-center text-gray-400">Chargement des fournisseurs…</p> : filteredSuppliers.length === 0 ? <p className="text-center text-gray-400">Aucun fournisseur disponible pour le moment.</p> : (
+        <div className="grid grid-cols-1 gap-6 px-4 pb-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredSuppliers.map((supplier) => {
+            const productCount = products.filter((product) => product.supplier_id === supplier.id).length;
+            return <article key={supplier.id} onClick={() => navigate(`/suppliers/${supplier.id}`)} className="cursor-pointer overflow-hidden rounded-2xl bg-[#1f1f1f] shadow-lg transition hover:scale-105">
+              {supplier.logo ? <img src={supplier.logo} alt={supplier.company_name ?? "Logo fournisseur"} className="h-56 w-full object-cover" /> : <div className="flex h-56 items-center justify-center bg-gray-800 text-gray-400">Aucun logo</div>}
+              <div className="p-4"><h2 className="text-2xl font-bold text-white">{supplier.company_name}</h2>{supplier.certified && <span className="mt-2 inline-flex rounded-full bg-yellow-500/20 px-2 py-1 text-xs font-semibold text-yellow-400">✓ Fournisseur certifié</span>}<p className="mt-1 text-yellow-400">{flags[supplier.country ?? ""] ?? "🌍"} {supplier.country}</p><p className="mt-2 text-gray-400">{supplier.category}</p><p className="mt-3 line-clamp-2 text-gray-300">{supplier.description}</p><div className="mt-4 flex items-center justify-between"><span className="font-semibold text-yellow-400">{productCount} produits</span><span className="rounded-lg bg-yellow-500 px-4 py-2 text-black">Voir</span></div></div>
+            </article>;
+          })}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default Suppliers;

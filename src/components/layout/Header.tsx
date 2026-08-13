@@ -20,6 +20,7 @@ const Header = () => {
   const {
     user,
     isAdmin,
+    isTransportPDG,
     signOut
   } = useAuth();
   const navLinks = [{
@@ -101,16 +102,26 @@ const Header = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
                 <User className="w-5 h-5" />
-                {isAdmin && <span className="absolute -top-1 -right-1 w-3 h-3 bg-secondary rounded-full"></span>}
+                {(isAdmin || isTransportPDG) && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-secondary rounded-full"></span>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <div className="px-2 py-1.5 text-sm font-medium">
                 {user.email}
               </div>
-              {isAdmin && <div className="px-2 py-1 text-xs text-secondary font-medium">
-                Admin
-              </div>}
+              {isAdmin && (
+  <div className="px-2 py-1 text-xs text-secondary font-medium">
+    Admin
+  </div>
+)}
+
+{isTransportPDG && !isAdmin && (
+  <div className="px-2 py-1 text-xs text-secondary font-medium">
+    PDG / Direction transport
+  </div>
+)}
               <DropdownMenuSeparator />
               {isAdmin && <DropdownMenuItem asChild>
                 <Link to="/admin" className="flex items-center gap-2">
