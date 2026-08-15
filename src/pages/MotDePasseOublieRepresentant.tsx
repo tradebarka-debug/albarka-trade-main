@@ -40,45 +40,22 @@ export default function MotDePasseOublieRepresentant() {
        <button
   onClick={async () => {
 
-    const { data } = await supabase
-      .from("representants")
-      .select("*")
-      .eq("code", code)
-      .eq("telephone", telephone)
-      .eq("email", email)
-      .single();
+    const { data, error } = await supabase.functions.invoke("representant-auth", {
+      body: { action: "forgot_password", code, telephone, email },
+    });
 
-    if (!data) {
-      alert("Informations incorrectes.");
+    if (error || data?.error) {
+      alert(data?.error || "Informations incorrectes.");
       return;
     }
 
-    const otp = Math.floor(
-      100000 + Math.random() * 900000
-    ).toString();
+    localStorage.setItem("representantCode", code);
 
-    const expireLe = new Date(
-      Date.now() + 10 * 60 * 1000
-    );
+    if (!data.smsSent) {
+      alert("Un code OTP a été généré mais n'a pas pu être envoyé par SMS. Contactez le support.");
+    }
 
-   await supabase
-  .from("representants")
-  .update({
-    otp: otp,
-    otp_expire: expireLe.toISOString(),
-  })
-  .eq("code", code);
-  localStorage.setItem("representantCode", code);
-    alert(
-  "Votre code OTP est : " +
-  otp +
-  "\n\n(En production il sera envoyé par SMS ou par email.)"
-);
-localStorage.setItem("representantCode", code);
-
-navigate("/verification-otp");
-
-navigate("/verification-otp");
+    navigate("/verification-otp");
 
   }}
   className="w-full bg-primary text-black p-4 rounded-xl font-bold"

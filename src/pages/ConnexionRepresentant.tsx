@@ -18,21 +18,19 @@ export default function ConnexionRepresentant() {
     return;
   }
 
-  const { data, error } = await supabase
-    .from("representants")
-    .select("*")
-    .eq("code", code)
-    .eq("pin", pin)
-    .single();
+  const { data, error } = await supabase.functions.invoke("representant-auth", {
+    body: { action: "login", code, pin },
+  });
 
-  if (error || !data) {
-    alert("Code représentant ou Code PIN incorrect.");
+  if (error || data?.error || !data?.representant) {
+    alert(data?.error || "Code représentant ou Code PIN incorrect.");
     return;
   }
 
-  localStorage.setItem("representantId", data.id);
-  localStorage.setItem("representantCode", data.code);
-  localStorage.setItem("representantEmail", data.email);
+  localStorage.setItem("representantId", data.representant.id);
+  localStorage.setItem("representantCode", data.representant.code);
+  localStorage.setItem("representantEmail", data.representant.email);
+  localStorage.setItem("representantSessionToken", data.sessionToken);
 
  navigate("/dashboard-representant");
 };

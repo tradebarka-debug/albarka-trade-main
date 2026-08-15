@@ -1,0 +1,11 @@
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m22[m[36m-[mconst [isTransportPDG, setIsTransportPDG] = useState(false);
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m23[m[36m-[mconst [isLoading, setIsLoading] = useState(true);
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m24[m[36m-[m
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m25[m[36m-[m const checkUserRoles = async (userId: string) => {
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m26[m[36m-[m  const { data, error } = await supabase
+[35msrc/hooks/useAuth.tsx[m[36m:[m[32m27[m[36m:[m    .[1;31mfrom('user_roles')[m
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m28[m[36m-[m    .select('role')
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m29[m[36m-[m    .eq('user_id', userId);
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m30[m[36m-[m
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m31[m[36m-[m  if (error) {
+[35msrc/hooks/useAuth.tsx[m[36m-[m[32m32[m[36m-[m    console.error('Error checking user roles:', error);

@@ -1,33 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useRepresentant } from "@/hooks/useRepresentant";
 
 export default function ProfilRepresentant() {
-    const [representant, setRepresentant] = useState(null);
-
-    useEffect(() => {
-        const fetchRepresentant = async () => {
-            const representantId = localStorage.getItem("representantId");
-            if (!representantId) return;
-
-            const { data, error } = await supabase
-                .from("representants")
-                .select("*")
-                .eq("id", representantId)
-                .single();
-
-            if (error) {
-                console.error("Error fetching representant:", error);
-                return;
-            }
-
-            setRepresentant(data ?? null);
-        };
-
-        fetchRepresentant();
-    }, []);
+    const { representant } = useRepresentant();
 
     return (
 

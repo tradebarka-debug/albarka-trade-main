@@ -9,24 +9,17 @@ export default function LoginRepresentant() {
     const [pin, setPin] = useState("");
 
     const connexion = async () => {
-        const { data } = await supabase
-            .from("representants" as any)
-            .select("*")
-            .eq("code", code)
-            .eq("pin", pin)
-            .single();
+        const { data, error } = await supabase.functions.invoke("representant-auth", {
+            body: { action: "login", code, pin },
+        });
 
-        if (!data) {
-            alert("Code représentant ou PIN incorrect.");
+        if (error || data?.error || !data?.representant) {
+            alert(data?.error || "Code représentant ou PIN incorrect.");
             return;
         }
 
-        const representant = data as any;
-
-        localStorage.setItem(
-            "representantCode",
-            representant.code
-        );
+        localStorage.setItem("representantCode", data.representant.code);
+        localStorage.setItem("representantSessionToken", data.sessionToken);
         navigate("/dashboard-representant");
     };
 

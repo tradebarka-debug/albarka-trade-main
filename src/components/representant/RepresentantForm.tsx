@@ -162,11 +162,9 @@ export default function RepresentantForm() {
                             alert("Les deux Codes PIN ne correspondent pas.");
                             return;
                         }
-                        const codeRepresentant = "ATI-REP-" + Date.now();
-                        const { error } = await supabase
-                            .from("representants" as any)
-                            .insert({ 
-                                code: codeRepresentant,
+                        const { data, error } = await supabase.functions.invoke("representant-auth", {
+                            body: {
+                                action: "signup",
                                 nom: form.nom,
                                 prenom: form.prenom,
                                 telephone: form.telephone,
@@ -177,15 +175,16 @@ export default function RepresentantForm() {
                                 numero_piece: form.numeroPiece,
                                 pin: form.pin,
                                 parrain: parrain,
-                            });
+                            },
+                        });
 
-                        if (error) {
-                            alert(error.message);
+                        if (error || data?.error) {
+                            alert(data?.error || error?.message);
                             return;
                         }
 
-                        localStorage.setItem("representantCode", codeRepresentant);
-                        localStorage.setItem("representantPin", form.pin);
+                        localStorage.setItem("representantCode", data.code);
+                        localStorage.setItem("representantSessionToken", data.sessionToken);
                         window.location.href = "/dashboard-representant";
                     }}
                 >

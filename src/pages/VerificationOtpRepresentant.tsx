@@ -21,7 +21,10 @@ export default function VerificationOtpRepresentant() {
         />
 
        <button
-  onClick={() => navigate("/representant/nouveau-pin")}
+  onClick={() => {
+    localStorage.setItem("representantOtp", otp);
+    navigate("/representant/nouveau-pin");
+  }}
   className="w-full bg-primary text-black p-4 rounded-xl font-bold"
 >
           Vérifier

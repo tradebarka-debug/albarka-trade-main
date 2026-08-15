@@ -1,36 +1,9 @@
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useRepresentant } from "@/hooks/useRepresentant";
 
 export default function PackRepresentant() {
-  const [representant, setRepresentant] = useState<any>(null);
-
-  useEffect(() => {
-  const fetchRepresentant = async () => {
-    const codeRepresentant = localStorage.getItem("representantCode");
-
-    console.log("Code =", codeRepresentant);
-
-    const { data, error } = await supabase
-      .from("representants")
-      .select("*")
-      .eq("code", codeRepresentant)
-      .single();
-
-    console.log("Erreur =", error);
-    console.log("Data =", data);
-
-    if (error) {
-      return;
-    }
-
-    setRepresentant(data as any);
-  };
-
-  fetchRepresentant();
-}, []);
-console.log("Representant State =", representant);
+  const { representant } = useRepresentant();
 
   return (
     <RepresentantLayout title="Mon Pack">

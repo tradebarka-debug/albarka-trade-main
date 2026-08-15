@@ -21,9 +21,9 @@ import { useState } from "react";
 const menuItems = [
   { path: "/admin", label: "Tableau de bord", icon: LayoutDashboard },
   { path: "/admin/produits", label: "Produits", icon: Package },
-  { path: "/admin/fast-food", label: "Menu Fast Food", icon: UtensilsCrossed },
-  { path: "/admin/restaurants", label: "Restaurants partenaires", icon: UtensilsCrossed },
-  { path: "/admin/menus", label: "Menus restaurants", icon: UtensilsCrossed },
+  { path: "/admin/fast-food", label: "Menu Fast Food", icon: UtensilsCrossed, permission: "manage_restaurants" },
+  { path: "/admin/restaurants", label: "Restaurants partenaires", icon: UtensilsCrossed, permission: "manage_restaurants" },
+  { path: "/admin/menus", label: "Menus restaurants", icon: UtensilsCrossed, permission: "manage_restaurants" },
   { path: "/admin/formations", label: "Formations", icon: GraduationCap },
   { path: "/admin/services", label: "Services", icon: Wrench },
   { path: "/admin/emplois", label: "Offres d'emploi", icon: Briefcase },
@@ -33,15 +33,23 @@ const menuItems = [
   { path: "/admin/service-requests", label: "Demandes de services", icon: Wrench },
   { path: "/admin/orders", label: "Commandes", icon: Package },
   { path: "/admin/liquidation", label: "Liquidation", icon: Package },
-  { path: "/admin/admin-partners", label: "Fournisseurs", icon: Users },
+  { path: "/admin/admin-partners", label: "Fournisseurs", icon: Users, permission: "manage_suppliers" },
   { path: "/admin/voyages", label: "Voyages & Courriers", icon: Bus },
   { path: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
 ];
 
 const AdminSidebar = () => {
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, hasPermission } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (item.path === "/admin/utilisateurs") {
+      return hasPermission("manage_team_accounts") || hasPermission("create_users");
+    }
+
+    return !item.permission || hasPermission(item.permission);
+  });
 
   const isActive = (path: string) => {
     if (path === "/admin") {
@@ -77,7 +85,7 @@ const AdminSidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => (
+        {visibleMenuItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}

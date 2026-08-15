@@ -4,6 +4,19 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const MAX_NAME_LENGTH = 100;
 const MIN_PASSWORD_LENGTH = 6;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const rolePermissionDefaults: Record<string, string[]> = {
+  general_management: ["create_users", "manage_team_accounts", "view_team_overview", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  directeur_general: ["create_users", "manage_team_accounts", "view_team_overview", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  directeur_generale: ["create_users", "manage_team_accounts", "view_team_overview", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  directeur_commercial: ["create_users", "manage_team_accounts", "view_team_overview", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  direction_commerciale: ["create_users", "manage_team_accounts", "view_team_overview", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  responsable_commercial: ["create_users", "manage_team_accounts", "view_team_overview", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  commercial_manager: ["create_users", "manage_team_accounts", "view_team_overview", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  agent_commercial: ["create_partners", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  agent_commerciale: ["create_partners", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  commercial_agent: ["create_partners", "manage_restaurants", "manage_suppliers", "manage_factories"],
+  sales_agent: ["create_partners", "manage_restaurants", "manage_suppliers", "manage_factories"],
+};
 
 const allowedOrigins = [
   "https://albarka-trade.lovable.app",
@@ -16,7 +29,8 @@ const allowedOrigins = [
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const allowedOrigin = allowedOrigins.includes(origin)
+  const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+  const allowedOrigin = allowedOrigins.includes(origin) || isLocalOrigin
     ? origin
     : allowedOrigins[0];
 
@@ -161,10 +175,15 @@ Deno.serve(async (req) => {
         .select(
           `
           id,
+          role,
           organization_id,
           organization_role_id,
           country_id,
-          is_active
+          is_active,
+          organization_roles (
+            name,
+            code
+          )
         `
         )
         .eq("id", currentUser.id)
@@ -182,6 +201,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    let requesterOrganizationType: string | null = null;
+    if (requesterProfile.organization_id) {
+      const { data: requesterOrganization, error: requesterOrganizationError } =
+        await supabaseAdmin
+          .from("organizations")
+          .select("organization_type")
+          .eq("id", requesterProfile.organization_id)
+          .maybeSingle();
+      if (requesterOrganizationError) throw requesterOrganizationError;
+      requesterOrganizationType = requesterOrganization?.organization_type ?? null;
+    }
+
     /*
      * ---------------------------------------------------------
      * Vérification des permissions
@@ -195,7 +226,33 @@ Deno.serve(async (req) => {
       .eq("role", "admin")
       .maybeSingle();
 
-    const isSystemAdmin = !!systemAdmin;
+    const requesterOrganizationRole = Array.isArray(requesterProfile.organization_roles)
+      ? requesterProfile.organization_roles[0]
+      : requesterProfile.organization_roles;
+    const requesterRoleCode = requesterOrganizationRole?.code;
+    const effectiveRoleCode = requesterRoleCode ?? requesterProfile.role;
+    const normalizedRoleCode = String(effectiveRoleCode ?? "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[ -]+/g, "_");
+    const isManagementRole =
+      [
+        "general_management",
+        "directeur_general",
+        "directeur_generale",
+        "pdg",
+        "president",
+        "ceo",
+        "direction_general",
+      ].includes(normalizedRoleCode) &&
+      // Le code de poste "ceo"/"pdg" est réutilisé par chaque organisation
+      // partenaire (fournisseur, restaurant, usine...). Seul le PDG/la
+      // direction de l'organisation Albarka Trade elle-même doit obtenir
+      // les droits d'administration interne.
+      requesterOrganizationType === "albarka_trade";
+    const isSystemAdmin = !!systemAdmin || requesterProfile.role === "admin";
 
     const { data: requesterPermissions, error: permissionsError } =
       await supabaseAdmin
@@ -221,11 +278,178 @@ Deno.serve(async (req) => {
         .map((item: any) => item.permissions?.code)
         .filter(Boolean)
     );
+    const defaultPermissions =
+      // Ces codes de poste correspondent a l'organigramme interne Albarka
+      // Trade : ne jamais les appliquer a un poste d'une organisation
+      // partenaire, meme en cas d'homonymie de code.
+      requesterOrganizationType === "albarka_trade"
+        ? rolePermissionDefaults[normalizedRoleCode] ?? []
+        : [];
+    defaultPermissions.forEach((permission) => permissionCodes.add(permission));
+
+    const { data: organizationRoles, error: organizationRolesError } =
+      await supabaseAdmin
+        .from("organization_roles")
+        .select("id, organization_id, parent_role_id");
+
+    if (organizationRolesError) {
+      throw organizationRolesError;
+    }
+
+    const roleById = new Map<number, any>(
+      (organizationRoles || []).map((role: any) => [Number(role.id), role])
+    );
+    const hasManagedRoles =
+      (organizationRoles || []).some(
+        (role: any) =>
+          Number(role.parent_role_id) ===
+          Number(requesterProfile.organization_role_id)
+      ) &&
+      // Un PDG/manager partenaire a toujours des postes subalternes dans SA
+      // propre organisation : ça ne doit donner des droits d'administration
+      // interne (creer/gerer des comptes, ouvrir un compte partenaire dans
+      // une autre organisation) que pour un manager Albarka Trade lui-même.
+      requesterOrganizationType === "albarka_trade";
+
+    const isSubordinateRole = (targetRoleId: number | null | undefined) => {
+      if (isSystemAdmin) {
+        return true;
+      }
+
+      if (!requesterProfile.organization_role_id || !targetRoleId) {
+        return false;
+      }
+
+      let currentRole = roleById.get(Number(targetRoleId));
+      const visitedRoles = new Set<number>();
+
+      while (currentRole?.parent_role_id) {
+        const parentRoleId = Number(currentRole.parent_role_id);
+        if (parentRoleId === Number(requesterProfile.organization_role_id)) {
+          return true;
+        }
+
+        if (visitedRoles.has(parentRoleId)) {
+          break;
+        }
+
+        visitedRoles.add(parentRoleId);
+        currentRole = roleById.get(parentRoleId);
+      }
+
+      return false;
+    };
+
+    const isGlobalManager = isSystemAdmin || isManagementRole;
+    const isInRequesterScope = (organizationId: number | null, countryId: number | null) =>
+      isGlobalManager || (
+        Number(organizationId) === Number(requesterProfile.organization_id) &&
+        (!requesterProfile.country_id || Number(countryId) === Number(requesterProfile.country_id))
+      );
+
+    const canManageProfile = (profile: any) =>
+      isInRequesterScope(profile.organization_id, profile.country_id) &&
+      isSubordinateRole(profile.organization_role_id);
+    const isPartnerPdg = (profile: any) =>
+      ["ceo", "pdg", "general_management"].includes(
+        roleById.get(Number(profile.organization_role_id))?.code
+      );
+    const canApprovePendingPartner = (profile: any) =>
+      !profile.is_active &&
+      isPartnerPdg(profile) &&
+      (isGlobalManager ||
+        permissionCodes.has("approve_organization") ||
+        permissionCodes.has("manage_partners"));
 
     const hasPermission = (permission: string) =>
-      isSystemAdmin || permissionCodes.has(permission);
+      isSystemAdmin ||
+      permissionCodes.has(permission) ||
+      ((isManagementRole || hasManagedRoles) && [
+        "create_users",
+        "manage_team_accounts",
+        "delete_users",
+      ].includes(permission));
+    const canOpenPartnerAccount =
+      isGlobalManager ||
+      hasManagedRoles ||
+      permissionCodes.has("create_partners") ||
+      permissionCodes.has("manage_partners");
 
     const { action, ...params } = await req.json();
+
+    if (action === "auth_context") {
+      return jsonResponse(
+        {
+          organization_role_code: requesterRoleCode || null,
+          organization_role_name: requesterOrganizationRole?.name || null,
+          profile_role: requesterProfile.role || null,
+          permission_codes: [...permissionCodes],
+          is_system_admin: isSystemAdmin,
+          is_management_role: isManagementRole,
+          has_managed_roles: hasManagedRoles,
+          is_internal_organization: requesterOrganizationType === "albarka_trade",
+        },
+        200,
+        corsHeaders
+      );
+    }
+
+    if (action === "config") {
+      const [organizationsResult, countriesResult, rolesResult, profilesResult] =
+        await Promise.all([
+          supabaseAdmin
+            .from("organizations")
+            .select("id, name, organization_type, country_id, actif")
+            .order("name"),
+          supabaseAdmin.from("countries").select("id, name").order("name"),
+          supabaseAdmin
+            .from("organization_roles")
+            .select("id, name, code, organization_id, parent_role_id")
+            .order("id"),
+          supabaseAdmin
+            .from("profiles")
+            .select("id, nom, email, organization_id, organization_role_id, country_id, is_active")
+            .order("nom"),
+        ]);
+
+      if (organizationsResult.error) throw organizationsResult.error;
+      if (countriesResult.error) throw countriesResult.error;
+      if (rolesResult.error) throw rolesResult.error;
+      if (profilesResult.error) throw profilesResult.error;
+
+      const scopedOrganizations = canOpenPartnerAccount
+        ? organizationsResult.data || []
+        : (organizationsResult.data || []).filter(
+            (organization: any) =>
+              Number(organization.id) === Number(requesterProfile.organization_id)
+          );
+      const scopedCountries = canOpenPartnerAccount
+        ? countriesResult.data || []
+        : (countriesResult.data || []).filter(
+            (country: any) =>
+              !requesterProfile.country_id ||
+              Number(country.id) === Number(requesterProfile.country_id)
+          );
+      const scopedRoles = canOpenPartnerAccount
+        ? rolesResult.data || []
+        : (rolesResult.data || []).filter(
+            (role: any) =>
+              Number(role.organization_id) === Number(requesterProfile.organization_id)
+          );
+
+      return jsonResponse(
+        {
+          organizations: scopedOrganizations,
+          countries: scopedCountries,
+          organization_roles: scopedRoles,
+          profiles: profilesResult.data || [],
+          current_profile: requesterProfile,
+          can_open_partner_account: canOpenPartnerAccount,
+        },
+        200,
+        corsHeaders
+      );
+    }
 
     /*
      * =========================================================
@@ -280,7 +504,7 @@ Deno.serve(async (req) => {
       /*
        * Un utilisateur organisationnel ne voit que son organisation.
        */
-      if (!isSystemAdmin && requesterProfile.organization_id) {
+      if (!isGlobalManager && requesterProfile.organization_id) {
         query = query.eq(
           "organization_id",
           requesterProfile.organization_id
@@ -290,7 +514,7 @@ Deno.serve(async (req) => {
       /*
        * Si le demandeur possède un pays, il reste dans son périmètre.
        */
-      if (!isSystemAdmin && requesterProfile.country_id) {
+      if (!isGlobalManager && requesterProfile.country_id) {
         query = query.eq(
           "country_id",
           requesterProfile.country_id
@@ -304,33 +528,44 @@ Deno.serve(async (req) => {
         throw profilesError;
       }
 
-      const users = (profiles || []).map((profile: any) => ({
-        id: profile.id,
-        email: profile.email,
-        full_name: profile.nom || "",
-        created_at: profile.created_at,
-        last_sign_in_at: null,
-        role: profile.role,
-        organization_id: profile.organization_id,
-        organization_name:
-          profile.organizations?.name || null,
-        organization_role_id:
-          profile.organization_role_id,
-        organization_role_name:
-          profile.organization_roles?.name || null,
-        organization_role_code:
-          profile.organization_roles?.code || null,
-        parent_role_id:
-          profile.organization_roles?.parent_role_id || null,
-        manager_user_id:
-          profile.manager_user_id || null,
-        country_id:
-          profile.country_id || null,
-        country_name:
-          profile.countries?.name || null,
-        is_active:
-          profile.is_active,
-      }));
+      const users = (profiles || [])
+        .filter((profile: any) =>
+          isSystemAdmin ||
+          (isManagementRole && isInRequesterScope(profile.organization_id, profile.country_id)) ||
+          canManageProfile(profile) ||
+          canApprovePendingPartner(profile) ||
+          profile.id === currentUser.id
+        )
+        .map((profile: any) => {
+          const organizationRole = Array.isArray(profile.organization_roles)
+            ? profile.organization_roles[0]
+            : profile.organization_roles;
+          const organization = Array.isArray(profile.organizations)
+            ? profile.organizations[0]
+            : profile.organizations;
+          const country = Array.isArray(profile.countries)
+            ? profile.countries[0]
+            : profile.countries;
+
+          return {
+            id: profile.id,
+            email: profile.email,
+            full_name: profile.nom || "",
+            created_at: profile.created_at,
+            last_sign_in_at: null,
+            role: profile.role,
+            organization_id: profile.organization_id,
+            organization_name: organization?.name || null,
+            organization_role_id: profile.organization_role_id,
+            organization_role_name: organizationRole?.name || null,
+            organization_role_code: organizationRole?.code || null,
+            parent_role_id: organizationRole?.parent_role_id || null,
+            manager_user_id: profile.manager_user_id || null,
+            country_id: profile.country_id || null,
+            country_name: country?.name || null,
+            is_active: profile.is_active,
+          };
+        });
 
       return jsonResponse(
         { users },
@@ -348,7 +583,8 @@ Deno.serve(async (req) => {
     if (action === "create") {
       if (
         !hasPermission("create_users") &&
-        !hasPermission("manage_team_accounts")
+        !hasPermission("manage_team_accounts") &&
+        !hasPermission("create_partners")
       ) {
         return jsonResponse(
           { error: "Vous n'avez pas l'autorisation de créer un compte" },
@@ -399,9 +635,12 @@ Deno.serve(async (req) => {
 
       /*
        * Vérification organisation
+       * (les comptes créateurs de partenaires peuvent ouvrir un compte
+       * dans une autre organisation, ex: PDG d'un fournisseur)
        */
       if (
         !isSystemAdmin &&
+        !canOpenPartnerAccount &&
         Number(organization_id) !==
           Number(requesterProfile.organization_id)
       ) {
@@ -443,6 +682,18 @@ Deno.serve(async (req) => {
         return jsonResponse(
           { error: "Ce poste n'appartient pas à cette organisation" },
           400,
+          corsHeaders
+        );
+      }
+
+      const isPartnerPdg = ["ceo", "pdg", "general_management"].includes(
+        organizationRole.code
+      );
+      if (!isSubordinateRole(Number(organization_role_id)) &&
+        !(canOpenPartnerAccount && isPartnerPdg)) {
+        return jsonResponse(
+          { error: "Vous ne pouvez créer que des postes subalternes à votre fonction" },
+          403,
           corsHeaders
         );
       }
@@ -509,12 +760,9 @@ Deno.serve(async (req) => {
           );
         }
 
-        if (
-          Number(manager.organization_id) !==
-          Number(organization_id)
-        ) {
+        if (!isInRequesterScope(manager.organization_id, manager.country_id) && !isSystemAdmin) {
           return jsonResponse(
-            { error: "Le responsable appartient à une autre organisation" },
+            { error: "Le responsable est hors de votre zone de gestion" },
             400,
             corsHeaders
           );
@@ -536,6 +784,14 @@ Deno.serve(async (req) => {
           return jsonResponse(
             { error: "Le responsable doit appartenir au même pays" },
             400,
+            corsHeaders
+          );
+        }
+
+        if (!isSystemAdmin && manager.id !== currentUser.id && !canManageProfile(manager)) {
+          return jsonResponse(
+            { error: "Le responsable n'appartient pas à votre chaîne hiérarchique" },
+            403,
             corsHeaders
           );
         }
@@ -570,17 +826,22 @@ Deno.serve(async (req) => {
       /*
        * Création du profil.
        *
-       * On conserve "user" pour le rôle système.
-       * Le véritable poste métier est organization_role_id.
+       * Le trigger on_auth_user_created insère déjà une ligne profiles
+       * dès la création du compte Auth : on utilise upsert pour compléter
+       * cette ligne au lieu d'entrer en conflit avec elle.
+       *
+       * profiles.role est un enum métier (admin/restaurant/alimentaire/livreur)
+       * qui n'a pas de valeur générique "user" : on le laisse à null pour
+       * les comptes organisationnels, le vrai poste est organization_role_id.
        */
       const { error: profileError } =
         await supabaseAdmin
           .from("profiles")
-          .insert({
+          .upsert({
             id: newUserId,
             email,
             nom: full_name,
-            role: "user",
+            role: null,
             organization_id,
             organization_role_id,
             manager_user_id:
@@ -589,7 +850,10 @@ Deno.serve(async (req) => {
               organizationRole.code === "general_management"
                 ? null
                 : country_id,
-            is_active: true,
+            is_active:
+              canOpenPartnerAccount && isPartnerPdg && !isGlobalManager
+                ? false
+                : true,
           });
 
       if (profileError) {
@@ -657,7 +921,8 @@ Deno.serve(async (req) => {
     if (action === "update") {
       if (
         !hasPermission("manage_team_accounts") &&
-        !hasPermission("create_users")
+        !hasPermission("create_users") &&
+        !hasPermission("approve_organization")
       ) {
         return jsonResponse(
           { error: "Permission insuffisante" },
@@ -717,8 +982,35 @@ Deno.serve(async (req) => {
         );
       }
 
+      const canApproveTarget = canApprovePendingPartner(targetProfile);
+      if (!canManageProfile(targetProfile) && !canApproveTarget) {
+        return jsonResponse(
+          { error: "Vous ne pouvez gérer que les utilisateurs subalternes de votre zone" },
+          403,
+          corsHeaders
+        );
+      }
+
+      const requestedRoleId = organization_role_id ?? targetProfile.organization_role_id;
+      if (!isSubordinateRole(Number(requestedRoleId)) && !canApproveTarget) {
+        return jsonResponse(
+          { error: "Vous ne pouvez attribuer que des postes subalternes à votre fonction" },
+          403,
+          corsHeaders
+        );
+      }
+
+      if (!canManageProfile(targetProfile) && !canApproveTarget) {
+        return jsonResponse(
+          { error: "Vous ne pouvez supprimer que les utilisateurs subalternes de votre zone" },
+          403,
+          corsHeaders
+        );
+      }
+
       if (
         !isSystemAdmin &&
+        !canApproveTarget &&
         Number(targetProfile.organization_id) !==
           Number(requesterProfile.organization_id)
       ) {
@@ -731,6 +1023,7 @@ Deno.serve(async (req) => {
 
       if (
         !isSystemAdmin &&
+        !canApproveTarget &&
         requesterProfile.country_id &&
         targetProfile.country_id &&
         Number(targetProfile.country_id) !==
@@ -965,10 +1258,11 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("manage-users error:", error);
 
+    // Les erreurs Postgrest ne sont pas des instances d'Error mais ont un champ "message".
     const message =
-      error instanceof Error
-        ? error.message
-        : "Une erreur est survenue";
+      (error as any)?.message ||
+      (error instanceof Error ? error.message : null) ||
+      "Une erreur est survenue";
 
     return jsonResponse(
       { error: message },

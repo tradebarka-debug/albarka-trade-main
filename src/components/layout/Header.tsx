@@ -21,6 +21,8 @@ const Header = () => {
     user,
     isAdmin,
     isTransportPDG,
+    canAccessAdmin,
+    organizationRoleName,
     signOut
   } = useAuth();
   const navLinks = [{
@@ -102,7 +104,7 @@ const Header = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
                 <User className="w-5 h-5" />
-                {(isAdmin || isTransportPDG) && (
+                {(canAccessAdmin || isTransportPDG) && (
                   <span className="absolute -top-1 -right-1 w-3 h-3 bg-secondary rounded-full"></span>
                 )}
               </Button>
@@ -122,11 +124,22 @@ const Header = () => {
     PDG / Direction transport
   </div>
 )}
+              {organizationRoleName && (
+                <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
+                  {organizationRoleName}
+                </div>
+              )}
               <DropdownMenuSeparator />
-              {isAdmin && <DropdownMenuItem asChild>
+              <DropdownMenuItem asChild>
+                <Link to="/espace-utilisateur" className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Mon espace utilisateur
+                </Link>
+              </DropdownMenuItem>
+              {canAccessAdmin && <DropdownMenuItem asChild>
                 <Link to="/admin" className="flex items-center gap-2">
                   <Settings className="w-4 h-4" />
-                  Dashboard Admin
+                  Espace administratif
                 </Link>
               </DropdownMenuItem>}
               <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-destructive">
@@ -159,9 +172,13 @@ const Header = () => {
 
           {/* Mobile Auth Links */}
           {user ? <>
-            {isAdmin && <Link to="/admin" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-base text-secondary font-medium hover:bg-muted rounded-lg">
+            <Link to="/espace-utilisateur" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-base text-primary font-medium hover:bg-muted rounded-lg">
+              <User className="w-5 h-5" />
+              Mon espace utilisateur
+            </Link>
+            {canAccessAdmin && <Link to="/admin" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-base text-secondary font-medium hover:bg-muted rounded-lg">
               <Settings className="w-5 h-5" />
-              Dashboard Admin
+              Espace administratif
             </Link>}
             <button onClick={() => {
               handleSignOut();

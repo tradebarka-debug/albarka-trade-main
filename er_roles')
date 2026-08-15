@@ -1,0 +1,34 @@
+[35msrc/hooks/useAuth.tsx[m[36m:[m[32m27[m[36m:[m    .from('[1;31muser_roles[m')
+[35msrc/pages/admin/AdminUsers.tsx[m[36m:[m[32m204[m[36m:[m  .from("[1;31morganization_roles[m")
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m192[m[36m:[m      .from("[1;31muser_roles[m")
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m266[m[36m:[m          [1;31morganization_roles[m (
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m320[m[36m:[m          profile.[1;31morganization_roles[m?.name || null,
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m322[m[36m:[m          profile.[1;31morganization_roles[m?.code || null,
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m324[m[36m:[m          profile.[1;31morganization_roles[m?.parent_role_id || null,
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m420[m[36m:[m          .from("[1;31morganization_roles[m")
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m626[m[36m:[m       * [1;31muser_roles[m reste utilisé pour la compatibilité
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m630[m[36m:[m        .from("[1;31muser_roles[m")
+[35msupabase/functions/manage-users/index.ts[m[36m:[m[32m833[m[36m:[m          .from("[1;31morganization_roles[m")
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m24[m[36m:[m-- Create [1;31muser_roles[m table (separate for security)
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m25[m[36m:[mCREATE TABLE public.[1;31muser_roles[m (
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m32[m[36m:[m-- Enable RLS on [1;31muser_roles[m
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m33[m[36m:[mALTER TABLE public.[1;31muser_roles[m ENABLE ROW LEVEL SECURITY;
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m45[m[36m:[m    FROM public.[1;31muser_roles[m
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m53[m[36m:[m  ON public.[1;31muser_roles[m FOR SELECT
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m57[m[36m:[m  ON public.[1;31muser_roles[m FOR SELECT
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m61[m[36m:[m  ON public.[1;31muser_roles[m FOR ALL
+[35msupabase/migrations/20260110235622_44676f25-1140-4e0b-841e-a29a7885ca98.sql[m[36m:[m[32m76[m[36m:[m  INSERT INTO public.[1;31muser_roles[m (user_id, role)
+[35msupabase/migrations/20260207223041_40209c24-62ed-436d-bd39-dedae9af0797.sql[m[36m:[m[32m1[m[36m:[m-- Block anonymous access to [1;31muser_roles[m table
+[35msupabase/migrations/20260207223041_40209c24-62ed-436d-bd39-dedae9af0797.sql[m[36m:[m[32m3[m[36m:[mON public.[1;31muser_roles[m
+[35msupabase/migrations/20260210234854_0b03f0b8-ae00-45ce-af5a-4c1c2efcf1c6.sql[m[36m:[m[32m2[m[36m:[m-- Fix [1;31muser_roles[m RLS: convert user/admin view policies to PERMISSIVE 
+[35msupabase/migrations/20260210234854_0b03f0b8-ae00-45ce-af5a-4c1c2efcf1c6.sql[m[36m:[m[32m6[m[36m:[mDROP POLICY IF EXISTS "Users can view their own roles" ON public.[1;31muser_roles[m;
+[35msupabase/migrations/20260210234854_0b03f0b8-ae00-45ce-af5a-4c1c2efcf1c6.sql[m[36m:[m[32m7[m[36m:[mDROP POLICY IF EXISTS "Admins can view all roles" ON public.[1;31muser_roles[m;
+[35msupabase/migrations/20260210234854_0b03f0b8-ae00-45ce-af5a-4c1c2efcf1c6.sql[m[36m:[m[32m8[m[36m:[mDROP POLICY IF EXISTS "Block anonymous role access" ON public.[1;31muser_roles[m;
+[35msupabase/migrations/20260210234854_0b03f0b8-ae00-45ce-af5a-4c1c2efcf1c6.sql[m[36m:[m[32m12[m[36m:[m  ON public.[1;31muser_roles[m
+[35msupabase/migrations/20260210234854_0b03f0b8-ae00-45ce-af5a-4c1c2efcf1c6.sql[m[36m:[m[32m18[m[36m:[m  ON public.[1;31muser_roles[m
+[35msupabase/migrations/20260210234854_0b03f0b8-ae00-45ce-af5a-4c1c2efcf1c6.sql[m[36m:[m[32m25[m[36m:[m  ON public.[1;31muser_roles[m
+[35msupabase/migrations/20260808120000_add_supplier_certification_and_logos.sql[m[36m:[m[32m15[m[36m:[mCREATE TABLE IF NOT EXISTS public.[1;31muser_roles[m (
+[35msupabase/migrations/20260808120000_add_supplier_certification_and_logos.sql[m[36m:[m[32m22[m[36m:[mALTER TABLE public.[1;31muser_roles[m ENABLE ROW LEVEL SECURITY;
+[35msupabase/migrations/20260808120000_add_supplier_certification_and_logos.sql[m[36m:[m[32m26[m[36m:[mDROP POLICY IF EXISTS "Users can view their own roles" ON public.[1;31muser_roles[m;
+[35msupabase/migrations/20260808120000_add_supplier_certification_and_logos.sql[m[36m:[m[32m28[m[36m:[mON public.[1;31muser_roles[m FOR SELECT
+[35msupabase/migrations/20260808120000_add_supplier_certification_and_logos.sql[m[36m:[m[32m40[m[36m:[m    SELECT 1 FROM public.[1;31muser_roles[m

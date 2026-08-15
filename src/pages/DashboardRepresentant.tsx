@@ -1,32 +1,10 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
-import { supabase } from "@/integrations/supabase/client";
+import { useRepresentant } from "@/hooks/useRepresentant";
 
 export default function DashboardRepresentant() {
-    // DashboardRepresentant.tsx
-
-    const [representant, setRepresentant] = useState<any>(null);
-
-    const codeRepresentant = localStorage.getItem("representantCode");
-    useEffect(() => {
-        const chargerRepresentant = async () => {
-            if (!codeRepresentant) return;
-
-            const { data } = await supabase
-                .from("representants" as any)
-                .select("*")
-                .eq("code", codeRepresentant)
-                .single();
-
-            if (data) {
-                setRepresentant(data);
-            }
-        };
-
-        chargerRepresentant();
-    }, [codeRepresentant]);
+    const { representant } = useRepresentant();
     const menu = [
         {
             title: "👤 Mon Profil",

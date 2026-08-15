@@ -62,6 +62,39 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 /* =========================================================
+   HELPERS
+========================================================= */
+
+// Les erreurs d'edge function n'exposent pas le message réel (juste
+// "non-2xx status code"); on va le chercher dans le corps de la réponse.
+async function getFunctionErrorMessage(error: any, fallback: string) {
+  const response = error?.context;
+  if (response && typeof response.json === "function") {
+    try {
+      const body = await response.clone().json();
+      if (body?.error) return mapBackendErrorMessage(body.error as string);
+    } catch {
+      // corps non-JSON, on ignore
+    }
+  }
+  return mapBackendErrorMessage(error?.message || fallback);
+}
+
+function mapBackendErrorMessage(message: string) {
+  if (!message) return message;
+
+  if (message.includes("A user with this email address has already been registered")) {
+    return "Un compte existe deja avec cet email.";
+  }
+
+  if (message.includes("Invalid login credentials")) {
+    return "Email ou mot de passe incorrect.";
+  }
+
+  return message;
+}
+
+/* =========================================================
    TYPES
 ========================================================= */
 
@@ -140,7 +173,7 @@ interface UserFormData {
 ========================================================= */
 
 const AdminUsers = () => {
-  const { session, user: currentUser } = useAuth();
+  const { session, user: currentUser, isAdmin } = useAuth();
   const { toast } = useToast();
 
   /* ---------------------------------------------------------
@@ -154,6 +187,7 @@ const AdminUsers = () => {
     OrganizationRole[]
   >([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
+  const [canOpenPartnerAccount, setCanOpenPartnerAccount] = useState(false);
 
   /* ---------------------------------------------------------
      STATE
@@ -178,90 +212,87 @@ const AdminUsers = () => {
     is_active: true,
   });
 
+  const currentProfile = profiles.find(
+    (profile) => profile.id === currentUser?.id
+  );
+
+  const isSubordinateRole = (targetRoleId: number) => {
+    if (isAdmin) {
+      return true;
+    }
+
+    const targetRole = organizationRoles.find(
+      (item) => Number(item.id) === Number(targetRoleId)
+    );
+    if (
+      canOpenPartnerAccount &&
+      ["ceo", "pdg", "general_management"].includes(targetRole?.code || "")
+    ) {
+      return true;
+    }
+
+    if (!currentProfile?.organization_role_id) {
+      return false;
+    }
+
+    const pendingRoleIds = [Number(currentProfile.organization_role_id)];
+    const visitedRoleIds = new Set<number>();
+
+    while (pendingRoleIds.length > 0) {
+      const parentRoleId = pendingRoleIds.shift();
+      if (!parentRoleId || visitedRoleIds.has(parentRoleId)) continue;
+      visitedRoleIds.add(parentRoleId);
+
+      const childRoles = organizationRoles.filter(
+        (item) => Number(item.parent_role_id) === parentRoleId
+      );
+      if (childRoles.some((item) => Number(item.id) === Number(targetRoleId))) {
+        return true;
+      }
+      pendingRoleIds.push(...childRoles.map((item) => Number(item.id)));
+    }
+
+    return false;
+  };
+
   /* =========================================================
      CHARGEMENT DES DONNÉES DE CONFIGURATION
   ========================================================= */
 
   const fetchConfiguration = async () => {
     try {
-      const [
-        organizationsResult,
-        countriesResult,
-        rolesResult,
-        profilesResult,
-      ] = await Promise.all([
-       (supabase as any)
-  .from("organizations")
-          .select("id, name, organization_type, country_id, actif")
-          .order("name"),
+      const { data, error } = await supabase.functions.invoke("manage-users", {
+        body: { action: "config" },
+      });
 
-        (supabase as any)
-          .from("countries")
-          .select("id, name")
-          .order("name"),
-
-       (supabase as any)
-  .from("organization_roles")
-          .select(
-            "id, name, code, organization_id, parent_role_id"
-          )
-          .order("id"),
-
-        (supabase as any)
-          .from("profiles")
-          .select(
-            `
-              id,
-              nom,
-              email,
-              organization_id,
-              organization_role_id,
-              country_id,
-              is_active
-            `
-          )
-          .order("nom"),
-      ]);
-
-      if (organizationsResult.error) {
-        throw organizationsResult.error;
-      }
-
-      if (countriesResult.error) {
-        throw countriesResult.error;
-      }
-
-      if (rolesResult.error) {
-        throw rolesResult.error;
-      }
-
-      if (profilesResult.error) {
-        throw profilesResult.error;
-      }
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       setOrganizations(
-        (organizationsResult.data || []) as Organization[]
+        (data?.organizations || []) as Organization[]
       );
 
       setCountries(
-        (countriesResult.data || []) as Country[]
+        (data?.countries || []) as Country[]
       );
 
       setOrganizationRoles(
-        (rolesResult.data || []) as OrganizationRole[]
+        (data?.organization_roles || []) as OrganizationRole[]
       );
 
       setProfiles(
-        (profilesResult.data || []) as ProfileOption[]
+        (data?.profiles || []) as ProfileOption[]
       );
+      setCanOpenPartnerAccount(Boolean(data?.can_open_partner_account));
     } catch (error: any) {
       console.error("Erreur configuration AdminUsers:", error);
 
       toast({
         title: "Erreur",
-        description:
-          error.message ||
-          "Impossible de charger la configuration",
+        description: await getFunctionErrorMessage(
+          error,
+          "Impossible de charger la configuration"
+        ),
         variant: "destructive",
       });
     }
@@ -297,9 +328,10 @@ const AdminUsers = () => {
 
       toast({
         title: "Erreur",
-        description:
-          error.message ||
-          "Impossible de charger les utilisateurs",
+        description: await getFunctionErrorMessage(
+          error,
+          "Impossible de charger les utilisateurs"
+        ),
         variant: "destructive",
       });
     } finally {
@@ -357,10 +389,6 @@ const AdminUsers = () => {
      * Si l'utilisateur actuel appartient à une organisation,
      * on la sélectionne automatiquement.
      */
-    const currentProfile = profiles.find(
-      (profile) => profile.id === currentUser?.id
-    );
-
     if (currentProfile?.organization_id) {
       setFormData((previous) => ({
         ...previous,
@@ -406,14 +434,23 @@ const AdminUsers = () => {
       return [];
     }
 
-    return organizationRoles.filter(
-      (role) =>
-        Number(role.organization_id) ===
-        Number(formData.organization_id)
-    );
+    return organizationRoles
+      .filter(
+        (role) =>
+          Number(role.organization_id) ===
+          Number(formData.organization_id) &&
+          isSubordinateRole(role.id)
+      )
+      .sort((firstRole, secondRole) => {
+        const firstIsPdg = ["ceo", "pdg", "general_management"].includes(firstRole.code);
+        const secondIsPdg = ["ceo", "pdg", "general_management"].includes(secondRole.code);
+        return Number(secondIsPdg) - Number(firstIsPdg) || firstRole.name.localeCompare(secondRole.name, "fr");
+      });
   }, [
     organizationRoles,
     formData.organization_id,
+    canOpenPartnerAccount,
+    isSubordinateRole,
   ]);
 
   /* =========================================================
@@ -723,9 +760,10 @@ const AdminUsers = () => {
 
       toast({
         title: "Erreur",
-        description:
-          error.message ||
-          "Une erreur est survenue.",
+        description: await getFunctionErrorMessage(
+          error,
+          "Une erreur est survenue."
+        ),
         variant: "destructive",
       });
     } finally {
@@ -811,9 +849,10 @@ const AdminUsers = () => {
 
       toast({
         title: "Erreur",
-        description:
-          error.message ||
-          "Impossible de modifier le statut.",
+        description: await getFunctionErrorMessage(
+          error,
+          "Impossible de modifier le statut."
+        ),
         variant: "destructive",
       });
     }
@@ -877,9 +916,10 @@ const AdminUsers = () => {
 
       toast({
         title: "Erreur",
-        description:
-          error.message ||
-          "Impossible de supprimer l'utilisateur.",
+        description: await getFunctionErrorMessage(
+          error,
+          "Impossible de supprimer l'utilisateur."
+        ),
         variant: "destructive",
       });
     }
@@ -902,8 +942,9 @@ const AdminUsers = () => {
   const adminUsers = users.filter(
     (user) =>
       user.role === "admin" ||
-      user.organization_role_code ===
-        "general_management"
+      ["general_management", "directeur_general", "directeur_generale"].includes(
+        (user.organization_role_code || "").toLowerCase()
+      )
   ).length;
 
   /* =========================================================
@@ -1154,8 +1195,8 @@ const AdminUsers = () => {
                     {organizations
                       .filter(
                         (organization) =>
-                          organization.actif !==
-                            false
+                          organization.actif !== false &&
+                          (isAdmin || canOpenPartnerAccount || Number(organization.id) === Number(currentProfile?.organization_id))
                       )
                       .map((organization) => (
                         <SelectItem
@@ -1258,7 +1299,12 @@ const AdminUsers = () => {
                     </SelectTrigger>
 
                     <SelectContent>
-                      {countries.map(
+                      {countries
+                        .filter(
+                          (country) =>
+                            isAdmin || canOpenPartnerAccount || Number(country.id) === Number(currentProfile?.country_id)
+                        )
+                        .map(
                         (country) => (
                           <SelectItem
                             key={country.id}
@@ -1483,8 +1529,9 @@ const AdminUsers = () => {
                     <TableCell>
                       <Badge
                         variant={
-                          user.organization_role_code ===
-                          "general_management"
+                          ["general_management", "directeur_general", "directeur_generale"].includes(
+                            (user.organization_role_code || "").toLowerCase()
+                          )
                             ? "default"
                             : "secondary"
                         }

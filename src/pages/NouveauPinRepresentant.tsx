@@ -26,15 +26,20 @@ export default function NouveauPinRepresentant() {
       setLoading(true);
 
       const code = localStorage.getItem("representantCode");
+      const otp = localStorage.getItem("representantOtp") || "";
 
-await supabase
-  .from("representants")
-  .update({
-    pin: pin,
-    otp: null,
-    otp_expire: null,
-  })
-  .eq("code", code);
+      const { data, error } = await supabase.functions.invoke("representant-auth", {
+        body: { action: "reset_pin", code, otp, pin },
+      });
+
+      if (error || data?.error) {
+        setError(data?.error || "Une erreur est survenue.");
+        return;
+      }
+
+      if (data.sessionToken) {
+        localStorage.setItem("representantSessionToken", data.sessionToken);
+      }
 
      navigate("/connexion-representant");
     } catch (err) {

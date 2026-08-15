@@ -53,6 +53,7 @@ import MotDePasseOublieRepresentant from "./pages/MotDePasseOublieRepresentant";
 import VerificationOtpRepresentant from "./pages/VerificationOtpRepresentant";
 import NouveauPinRepresentant from "./pages/NouveauPinRepresentant";
 import BookingVerification from "@/pages/BookingVerification";
+import UserSpace from "@/pages/UserSpace";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -68,6 +69,7 @@ import AdminFastFood from "./pages/admin/AdminFastFood";
 import AdminLiquidation from "./pages/admin/AdminLiquidation";
 import AdminApplications from "./pages/admin/AdminApplications";
 import AdminServiceRequests from "./pages/admin/AdminServiceRequests";
+import OrganisationDashboard from "./pages/organisation/OrganisationDashboard";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -102,6 +104,8 @@ const App = () => (
                 <Route path="admin-partners" element={<AdminSuppliers />} />
                 <Route path="fournisseurs" element={<AdminSuppliers />} />
               </Route>
+
+              <Route path="/organisation" element={<OrganisationDashboard />} />
 
               <Route
                 path="/dashboard-representant"
@@ -195,6 +199,7 @@ const App = () => (
                         <Route path="/liquidation" element={<Liquidation />} />
                         <Route path="/livraisons" element={<Livraisons />} />
                         <Route path="/auth" element={<Auth />} />
+                        <Route path="/espace-utilisateur" element={<UserSpace />} />
                         <Route path="/restaurant/:slug" element={<RestaurantPage />} />
                         <Route path="/suppliers" element={<Suppliers />} />
                         <Route path="/suppliers/:id" element={<SupplierDetails />} />

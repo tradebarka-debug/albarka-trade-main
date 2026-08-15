@@ -1,32 +1,8 @@
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useRepresentant } from "@/hooks/useRepresentant";
 
 export default function FilleulsRepresentant() {
-  const [representant, setRepresentant] = useState<any>(null);
-
-  useEffect(() => {
-    const codeRepresentant = localStorage.getItem("representantCode");
-
-    if (!codeRepresentant) return;
-
-    const chargerRepresentant = async () => {
-      const { data, error } = await supabase
-        .from("representants")
-        .select("*")
-        .eq("code", codeRepresentant)
-        .single();
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      setRepresentant(data as any);
-    };
-
-    chargerRepresentant();
-  }, []);
+  const { representant } = useRepresentant();
   return (
     <RepresentantLayout title="Mes Filleuls">
 
