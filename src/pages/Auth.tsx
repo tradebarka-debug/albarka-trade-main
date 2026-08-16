@@ -15,7 +15,7 @@ const passwordSchema = z.string().min(6, "Le mot de passe doit contenir au moins
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, signIn, signUp, isLoading } = useAuth();
+  const { user, signIn, signUp, isLoading, canAccessAdmin, organizationRoleCode } = useAuth();
   const { toast } = useToast();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,12 +23,16 @@ const Auth = () => {
   const [signupData, setSignupData] = useState({ email: '', password: '', fullName: '' });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  // Redirect if already logged in
+  // Redirect if already logged in : un compte admin interne va vers /admin,
+  // un compte rattache a une organisation (PDG/employe partenaire ou
+  // Albarka Trade) va vers /organisation, les autres vers l'accueil.
   useEffect(() => {
     if (user && !isLoading) {
-      navigate('/');
+      if (canAccessAdmin) navigate('/admin');
+      else if (organizationRoleCode) navigate('/organisation');
+      else navigate('/');
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, canAccessAdmin, organizationRoleCode, navigate]);
 
   const validateForm = (email: string, password: string) => {
     const newErrors: { email?: string; password?: string } = {};
@@ -77,7 +81,8 @@ const Auth = () => {
         title: "Connexion réussie",
         description: "Bienvenue !",
       });
-      navigate('/');
+      // La redirection (admin / organisation / accueil) est geree par le
+      // useEffect ci-dessus une fois le role charge.
     }
     
     setIsSubmitting(false);

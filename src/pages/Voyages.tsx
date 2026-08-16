@@ -21,6 +21,7 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import { Bus, Calendar, MapPin, Users, QrCode, Phone, Mail, ArrowRight } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import { toast } from "sonner";
 
 const Voyages = () => {
@@ -211,6 +212,7 @@ console.log("voyage_id =", selectedRoute?.voyage_id);
       {/* Header */}
       <section className="bg-gradient-to-br from-emerald/10 via-background to-primary/5 py-12 md:py-20">
         <div className="container mx-auto px-4">
+          <BackButton />
           <div className="max-w-2xl">
             <span className="text-emerald font-medium text-sm uppercase tracking-wider">
               Réservation

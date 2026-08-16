@@ -23,7 +23,7 @@ type RestaurantPartnerRow = {
   country: string | null;
   country_id: number | null;
   is_active: boolean | null;
-  sort_order: number | null;
+  display_order: number | null;
 };
 
 const defaultForm = {
@@ -38,7 +38,7 @@ const defaultForm = {
   country: "Burkina Faso",
   country_id: 1,
   is_active: true,
-  sort_order: 0,
+  display_order: 0,
 };
 
 const AdminRestaurants = () => {
@@ -56,7 +56,7 @@ const AdminRestaurants = () => {
     const { data, error } = await supabase
       .from("restaurant_partners")
       .select("*")
-      .order("sort_order", { ascending: true, nullsFirst: false });
+      .order("display_order", { ascending: true, nullsFirst: false });
 
     if (error) {
       console.error(error);
@@ -100,7 +100,7 @@ const AdminRestaurants = () => {
       country: restaurant.country || "Burkina Faso",
       country_id: restaurant.country_id || Number(localStorage.getItem("country_id") || 1),
       is_active: restaurant.is_active ?? true,
-      sort_order: restaurant.sort_order ?? 0,
+      display_order: restaurant.display_order ?? 0,
     });
     setImageFile(null);
     setImagePreview(restaurant.image_url || null);
@@ -164,7 +164,7 @@ const AdminRestaurants = () => {
       country: form.country.trim(),
       country_id: Number(form.country_id),
       is_active: form.is_active,
-      sort_order: Number(form.sort_order),
+      display_order: Number(form.display_order),
     };
 
     if (editingId) {
@@ -287,7 +287,7 @@ const AdminRestaurants = () => {
             </div>
             <div className="space-y-2">
               <Label>Ordre affichage</Label>
-              <Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
+              <Input type="number" value={form.display_order} onChange={(e) => setForm({ ...form, display_order: Number(e.target.value) })} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Image du restaurant</Label>

@@ -39,6 +39,9 @@ const CompaniesTab = () => {
     description: "",
     phone: "",
     email: "",
+    pays: "Burkina Faso",
+    ville: "",
+    station_address: "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -80,6 +83,9 @@ const CompaniesTab = () => {
         description: form.description,
         telephone: form.phone,
         email: form.email,
+        pays: form.pays,
+        ville: form.ville,
+        station_address: form.station_address,
         logo_url,
       };
 
@@ -104,7 +110,7 @@ const CompaniesTab = () => {
       setEditing(null);
       setLogoFile(null);
       setLogoPreview(null);
-      setForm({ nom: "", description: "", phone: "", email: "" });
+      setForm({ nom: "", description: "", phone: "", email: "", pays: "Burkina Faso", ville: "", station_address: "" });
     },
     onError: () => {
       setUploading(false);
@@ -145,8 +151,11 @@ const CompaniesTab = () => {
           description: company.description || "",
           phone: company.telephone || "",
           email: company.email || "",
+          pays: company.pays || "Burkina Faso",
+          ville: company.ville || "",
+          station_address: company.station_address || "",
         }
-        : { nom: "", description: "", phone: "", email: "" }
+        : { nom: "", description: "", phone: "", email: "", pays: "Burkina Faso", ville: "", station_address: "" }
     );
     setLogoFile(null);
     setLogoPreview(company?.logo_url || null);
@@ -218,7 +227,7 @@ const CompaniesTab = () => {
       </Table>
 
       <Dialog open={!!editing} onOpenChange={() => setEditing(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-h-[90vh] max-w-sm overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing?.id ? "Modifier" : "Ajouter"} une compagnie</DialogTitle>
           </DialogHeader>
@@ -244,6 +253,32 @@ const CompaniesTab = () => {
               <Input
                 value={form.email}
                 onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Pays</Label>
+                <Input
+                  value={form.pays}
+                  onChange={(e) => setForm((p) => ({ ...p, pays: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Ville</Label>
+                <Input
+                  value={form.ville}
+                  onChange={(e) => setForm((p) => ({ ...p, ville: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Adresse de la gare / station</Label>
+              <Input
+                value={form.station_address}
+                onChange={(e) => setForm((p) => ({ ...p, station_address: e.target.value }))}
                 className="mt-1"
               />
             </div>

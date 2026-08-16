@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../integrations/supabase/client";
+import BackButton from "@/components/BackButton";
 
 type Supplier = { id: number; company_name: string | null; category: string | null; country: string | null; description: string | null; logo: string | null; certified: boolean };
 type Product = { id: number; supplier_id: number | null };
@@ -39,6 +40,7 @@ const Suppliers = () => {
 
   return (
     <div className="container mx-auto overflow-x-hidden px-4 py-10">
+      <BackButton />
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-bold text-white md:text-4xl">Réseau de partenaires</h1>
         <p className="mt-2 text-gray-400">Produits alimentaires, boissons, restauration, services et fournisseurs partenaires</p>

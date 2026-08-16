@@ -36,6 +36,7 @@ import NotFound from "./pages/NotFound";
 import RestaurantPage from "./pages/RestaurantPage";
 import CountryDetector from "./components/CountryDetector";
 import CountrySelector from "./components/CountrySelector";
+import ScrollToTop from "./components/ScrollToTop";
 import Representant from "./pages/Representant";
 import RepresentantHome from "./pages/RepresentantHome";
 import ConnexionRepresentant from "./pages/ConnexionRepresentant";
@@ -84,6 +85,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
               {/* Admin routes - without Header/Footer */}
               <Route path="/admin" element={<AdminLayout />}>

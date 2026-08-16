@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Phone, Mail, MapPin, Clock, Send, MessageCircle } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import { toast } from "sonner";
 import emailjs from "@emailjs/browser";
 
@@ -74,6 +75,7 @@ const Contact = () => {
       {/* Header */}
       <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/5 py-12 md:py-20">
         <div className="container mx-auto px-4">
+          <BackButton />
           <div className="max-w-2xl">
             <span className="text-primary font-medium text-sm uppercase tracking-wider">
               Contact

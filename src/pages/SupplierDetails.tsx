@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../integrations/supabase/client";
+import BackButton from "@/components/BackButton";
 
 const SupplierDetails = () => {
     const { id } = useParams();
@@ -87,6 +88,7 @@ const SupplierDetails = () => {
 
     return (
         <div className="container mx-auto py-10">
+            <BackButton />
             <h1 className="text-4xl font-bold text-yellow-400">
                 {supplier.company_name}
             </h1>

@@ -179,11 +179,7 @@ Deno.serve(async (req) => {
           organization_id,
           organization_role_id,
           country_id,
-          is_active,
-          organization_roles (
-            name,
-            code
-          )
+          is_active
         `
         )
         .eq("id", currentUser.id)
@@ -199,6 +195,18 @@ Deno.serve(async (req) => {
         403,
         corsHeaders
       );
+    }
+
+    let requesterOrganizationRole: { name: string; code: string } | null = null;
+    if (requesterProfile.organization_role_id) {
+      const { data: requesterRoleRow, error: requesterRoleError } =
+        await supabaseAdmin
+          .from("organization_roles")
+          .select("name, code")
+          .eq("id", requesterProfile.organization_role_id)
+          .maybeSingle();
+      if (requesterRoleError) throw requesterRoleError;
+      requesterOrganizationRole = requesterRoleRow ?? null;
     }
 
     let requesterOrganizationType: string | null = null;
@@ -226,9 +234,6 @@ Deno.serve(async (req) => {
       .eq("role", "admin")
       .maybeSingle();
 
-    const requesterOrganizationRole = Array.isArray(requesterProfile.organization_roles)
-      ? requesterProfile.organization_roles[0]
-      : requesterProfile.organization_roles;
     const requesterRoleCode = requesterOrganizationRole?.code;
     const effectiveRoleCode = requesterRoleCode ?? requesterProfile.role;
     const normalizedRoleCode = String(effectiveRoleCode ?? "")
@@ -257,13 +262,7 @@ Deno.serve(async (req) => {
     const { data: requesterPermissions, error: permissionsError } =
       await supabaseAdmin
         .from("role_permissions")
-        .select(
-          `
-          permissions (
-            code
-          )
-        `
-        )
+        .select("permission_id")
         .eq(
           "organization_role_id",
           requesterProfile.organization_role_id
@@ -273,11 +272,22 @@ Deno.serve(async (req) => {
       throw permissionsError;
     }
 
-    const permissionCodes = new Set(
-      (requesterPermissions || [])
-        .map((item: any) => item.permissions?.code)
-        .filter(Boolean)
-    );
+    const requesterPermissionIds = (requesterPermissions || [])
+      .map((item: any) => item.permission_id)
+      .filter((id: unknown) => id !== null && id !== undefined);
+
+    const permissionCodes = new Set<string>();
+    if (requesterPermissionIds.length > 0) {
+      const { data: permissionRows, error: permissionRowsError } =
+        await supabaseAdmin
+          .from("permissions")
+          .select("id, code")
+          .in("id", requesterPermissionIds);
+      if (permissionRowsError) throw permissionRowsError;
+      (permissionRows || []).forEach((row: any) => {
+        if (row.code) permissionCodes.add(row.code);
+      });
+    }
     const defaultPermissions =
       // Ces codes de poste correspondent a l'organigramme interne Albarka
       // Trade : ne jamais les appliquer a un poste d'une organisation
@@ -482,21 +492,7 @@ Deno.serve(async (req) => {
           organization_role_id,
           manager_user_id,
           country_id,
-          is_active,
-          organizations (
-            id,
-            name
-          ),
-          organization_roles (
-            id,
-            name,
-            code,
-            parent_role_id
-          ),
-          countries (
-            id,
-            name
-          )
+          is_active
         `
         )
         .order("created_at", { ascending: false });
@@ -528,6 +524,31 @@ Deno.serve(async (req) => {
         throw profilesError;
       }
 
+      // Jointure manuelle en JS plutot qu'un embed relationnel PostgREST :
+      // organizations/organization_roles/countries sont des tables drift
+      // (creees hors migration) dont les FK ne sont pas toujours reconnues
+      // par le cache de schema, ce qui fait echouer un select embarque.
+      const [organizationsAllResult, organizationRolesAllResult, countriesAllResult] =
+        await Promise.all([
+          supabaseAdmin.from("organizations").select("id, name"),
+          supabaseAdmin.from("organization_roles").select("id, name, code, parent_role_id"),
+          supabaseAdmin.from("countries").select("id, name"),
+        ]);
+
+      if (organizationsAllResult.error) throw organizationsAllResult.error;
+      if (organizationRolesAllResult.error) throw organizationRolesAllResult.error;
+      if (countriesAllResult.error) throw countriesAllResult.error;
+
+      const organizationsById = new Map(
+        (organizationsAllResult.data || []).map((org: any) => [Number(org.id), org])
+      );
+      const organizationRolesByIdMap = new Map(
+        (organizationRolesAllResult.data || []).map((role: any) => [Number(role.id), role])
+      );
+      const countriesById = new Map(
+        (countriesAllResult.data || []).map((country: any) => [Number(country.id), country])
+      );
+
       const users = (profiles || [])
         .filter((profile: any) =>
           isSystemAdmin ||
@@ -537,15 +558,9 @@ Deno.serve(async (req) => {
           profile.id === currentUser.id
         )
         .map((profile: any) => {
-          const organizationRole = Array.isArray(profile.organization_roles)
-            ? profile.organization_roles[0]
-            : profile.organization_roles;
-          const organization = Array.isArray(profile.organizations)
-            ? profile.organizations[0]
-            : profile.organizations;
-          const country = Array.isArray(profile.countries)
-            ? profile.countries[0]
-            : profile.countries;
+          const organizationRole = organizationRolesByIdMap.get(Number(profile.organization_role_id));
+          const organization = organizationsById.get(Number(profile.organization_id));
+          const country = countriesById.get(Number(profile.country_id));
 
           return {
             id: profile.id,

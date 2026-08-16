@@ -37,6 +37,7 @@ import {
   ChevronRight,
   Briefcase
 } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -151,6 +152,7 @@ const Formations = () => {
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-secondary/10 via-background to-primary/5 py-12 md:py-20">
         <div className="container mx-auto px-4">
+          <BackButton />
           <div className="max-w-3xl">
             <span className="text-secondary font-medium text-sm uppercase tracking-wider">
               Centre de Formation Professionnelle

@@ -13,6 +13,7 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import { Briefcase, MapPin, Clock, Users, Send, GraduationCap, Calendar, BookOpen } from "lucide-react";
+import BackButton from "@/components/BackButton";
 import { toast } from "sonner";
 
 const jobListings = [
@@ -452,6 +453,7 @@ ${trackingCode}
       {/* Header */}
       <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/5 py-12 md:py-20">
         <div className="container mx-auto px-4">
+          <BackButton />
           <div className="max-w-2xl">
             <span className="text-primary font-medium text-sm uppercase tracking-wider">
               Carrières & Formations

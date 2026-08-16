@@ -1,6 +1,7 @@
 import { ArrowRight, MapPin, Phone, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import BackButton from "@/components/BackButton";
 
 const Livraisons = () => {
   const countryId = Number(localStorage.getItem("country_id")) || 1;
@@ -12,6 +13,7 @@ const Livraisons = () => {
     <main className="bg-background min-h-screen text-foreground">
       <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/5 py-16 md:py-20">
         <div className="container mx-auto px-4">
+          <BackButton />
           <div className="max-w-3xl">
             <span className="text-primary font-semibold text-sm uppercase tracking-wider">Réseau de partenaires</span>
             <h1 className="text-3xl md:text-5xl font-bold mt-3 mb-4">Livreurs</h1>

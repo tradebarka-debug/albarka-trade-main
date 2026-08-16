@@ -43,7 +43,7 @@ interface PaymentRequest {
   id: string;
   created_at: string;
   customer_name: string | null;
-  phone: string | null;
+  telephone: string | null;
   address: string | null;
   total: number | null;
   amount: number | null;
@@ -191,10 +191,10 @@ const AdminPayments = () => {
 
   const filteredPayments = payments.filter(payment => {
     const matchesSearch =
-      payment.transaction_ref.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (payment.transaction_ref || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.contact?.phone_number?.includes(searchTerm);
+      (payment.telephone || "").includes(searchTerm);
 
     const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
 
@@ -348,7 +348,7 @@ const AdminPayments = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Téléphone</p>
-                  <p className="font-medium">{selectedPayment.contact?.phone_number || "N/A"}</p>
+                  <p className="font-medium">{selectedPayment.telephone || "N/A"}</p>
                 </div>
               </div>
 

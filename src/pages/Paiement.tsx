@@ -134,13 +134,14 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
 ⏰ Merci de vérifier et valider cette commande.`;
 
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    // wa.me est le lien universel officiel WhatsApp : fonctionne sur mobile
+    // (ouvre l'app) comme sur desktop (ouvre WhatsApp Web ou propose l'app).
+    const whatsappUrl = `https://wa.me/${adminPhone}?text=${encodeURIComponent(message)}`;
 
-    const whatsappUrl = isMobile
-      ? `whatsapp://send?phone=${adminPhone}&text=${encodeURIComponent(message)}`
-      : `https://web.whatsapp.com/send?phone=${adminPhone}&text=${encodeURIComponent(message)}`;
-
-    console.log("URL WhatsApp:", whatsappUrl);
-    window.open(whatsappUrl, "_blank");
+    // Redirection directe de l'onglet courant : window.open("_blank") est
+    // souvent bloqué par le navigateur une fois qu'un await a eu lieu avant
+    // l'appel (perte du contexte "geste utilisateur").
+    window.location.href = whatsappUrl;
   };
   const appliedPromoCode =
     location.state?.appliedPromoCode ||
@@ -170,61 +171,51 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
 
       setIsSubmitting(true);
 
-      let screenshotUrl = await uploadScreenshot();
-      if (screenshot) {
-        if (user) {
-          screenshotUrl = await uploadScreenshot();
-        }
+      // L'upload de la capture necessite un compte connecte (chemin de
+      // stockage prefixe par user.id) ; en invite, la commande est quand
+      // meme enregistree, juste sans capture jointe.
+      const screenshotUrl = user ? await uploadScreenshot() : null;
+
+      // La commande doit toujours etre enregistree, connecte ou non,
+      // sinon elle n'apparait jamais dans "Gestion des paiements".
+      const { error: paymentError } = await (supabase as any)
+        .from("orders")
+        .insert({
+          customer_name: formData.name,
+          telephone: formData.phone,
+          address: formData.address,
+          total: totalPrice,
+          payment_method: selectedMethod,
+          transaction_ref: formData.transactionRef,
+          status: "pending",
+          promo_code: appliedPromoCode || null,
+          screenshot: screenshotUrl,
+        })
+        .select("id")
+        .single();
+
+      if (paymentError) {
+        console.error('Error saving payment request:', paymentError);
+        toast.error("Erreur lors de l'enregistrement. Veuillez réessayer.");
+        setIsSubmitting(false);
+        return;
       }
 
-      // Save payment request to database if user is logged in
-      if (user) {
-        // Insert payment request (without phone number for security)
-        const { data: paymentData, error: paymentError } = await (supabase as any)
-          .from("orders")
-          .insert({
-            customer_name: formData.name,
-            phone: formData.phone,
-            address: formData.address,
-            total: totalPrice,
-            payment_method: selectedMethod,
-            transaction_ref: formData.transactionRef,
-            status: "pending",
-            promo_code: appliedPromoCode || null,
-            screenshot: screenshotUrl,
-          })
-          .select("id")
-          .single();
-
-        if (paymentError) {
-          console.error('Error saving payment request:', paymentError);
-          toast.error("Erreur lors de l'enregistrement. Veuillez réessayer.");
-          setIsSubmitting(false);
-          return;
-        }
-         }
-        // Store phone number separately in protected table (only admins can read)
-
-        // Save order items for stock tracking
-
-
-
-        // Envoyer notification WhatsApp à l'admin
-        // commission partenaire desactivée ici.
-        // Elle sera ajoutée seulement après validation du paiement par l'admin.
-        sendWhatsAppNotification();
-
-        setIsSubmitting(false);
-        setStep(3);
-        clearCart();
-        localStorage.removeItem("promoCode");
-        toast.success("Commande envoyée avec succès!");
-      } catch (error) {
-        console.error('Error submitting order:', error);
-        toast.error("Une erreur est survenue. Veuillez réessayer.");
-        setIsSubmitting(false);
-      }
-    } 
+      // Envoyer notification WhatsApp à l'admin
+      // commission partenaire desactivée ici.
+      // Elle sera ajoutée seulement après validation du paiement par l'admin.
+      clearCart();
+      localStorage.removeItem("promoCode");
+      toast.success("Commande envoyée avec succès!");
+      setIsSubmitting(false);
+      setStep(3);
+      sendWhatsAppNotification();
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      toast.error("Une erreur est survenue. Veuillez réessayer.");
+      setIsSubmitting(false);
+    }
+  };
 
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedMethod)!;
 
