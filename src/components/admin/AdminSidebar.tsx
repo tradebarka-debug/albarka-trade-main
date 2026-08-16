@@ -11,7 +11,9 @@ import {
   Users,
   CreditCard,
   Bus,
-  UtensilsCrossed
+  UtensilsCrossed,
+  Factory,
+  ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,8 @@ const menuItems = [
   { path: "/admin/orders", label: "Commandes", icon: Package },
   { path: "/admin/liquidation", label: "Liquidation", icon: Package },
   { path: "/admin/admin-partners", label: "Fournisseurs", icon: Users, permission: "manage_suppliers" },
+  { path: "/admin/usines", label: "Usines partenaires", icon: Factory, permission: "manage_factories" },
+  { path: "/admin/repertoire-partenaires", label: "Répertoire partenaires", icon: ClipboardList },
   { path: "/admin/voyages", label: "Voyages & Courriers", icon: Bus },
   { path: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
 ];

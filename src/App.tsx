@@ -12,6 +12,8 @@ import Index from "./pages/Index";
 import Boutique from "./pages/Boutique";
 import AdminOrders from "@/pages/AdminOrders";
 import AdminSuppliers from "./pages/admin/AdminSuppliers";
+import AdminFactories from "./pages/admin/AdminFactories";
+import AdminPartnersDirectory from "./pages/admin/AdminPartnersDirectory";
 import AdminRestaurants from "./pages/admin/AdminRestaurants";
 import RestaurantMenus from "./pages/admin/RestaurantMenus";
 import Panier from "./pages/Panier";
@@ -103,6 +105,8 @@ const App = () => (
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="admin-partners" element={<AdminSuppliers />} />
                 <Route path="fournisseurs" element={<AdminSuppliers />} />
+                <Route path="usines" element={<AdminFactories />} />
+                <Route path="repertoire-partenaires" element={<AdminPartnersDirectory />} />
               </Route>
 
               <Route path="/organisation" element={<OrganisationDashboard />} />

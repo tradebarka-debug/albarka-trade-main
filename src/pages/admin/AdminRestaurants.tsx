@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ImageIcon, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,9 @@ const AdminRestaurants = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadRestaurants = async () => {
     setLoading(true);
@@ -69,9 +73,16 @@ const AdminRestaurants = () => {
     loadRestaurants();
   }, []);
 
+  const resetImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const openCreate = () => {
     setEditingId(null);
     setForm({ ...defaultForm, country_id: Number(localStorage.getItem("country_id") || 1) });
+    resetImage();
     setDialogOpen(true);
   };
 
@@ -91,7 +102,37 @@ const AdminRestaurants = () => {
       is_active: restaurant.is_active ?? true,
       sort_order: restaurant.sort_order ?? 0,
     });
+    setImageFile(null);
+    setImagePreview(restaurant.image_url || null);
     setDialogOpen(true);
+  };
+
+  const selectImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      toast.error("Choisissez une image JPG, PNG ou WebP de 5 Mo maximum");
+      event.target.value = "";
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setForm((current) => ({ ...current, image_url: "" }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const uploadImage = async (file: File) => {
+    const extension = file.name.split(".").pop() || "png";
+    const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const path = `restaurants/${uniqueName}.${extension}`;
+    const { error } = await supabase.storage.from("restaurant-images").upload(path, file, { contentType: file.type });
+    if (error) throw error;
+    return supabase.storage.from("restaurant-images").getPublicUrl(path).data.publicUrl;
   };
 
   const saveRestaurant = async () => {
@@ -100,10 +141,21 @@ const AdminRestaurants = () => {
       return;
     }
 
+    let imageUrl = form.image_url.trim();
+    try {
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de l’envoi de l’image");
+      return;
+    }
+
     const payload = {
       name: form.name.trim(),
       slug: form.slug.trim() || form.name.trim().toLowerCase().replace(/\s+/g, "-"),
-      image_url: form.image_url.trim(),
+      image_url: imageUrl,
       description: form.description.trim(),
       location: form.location.trim(),
       hours: form.hours.trim(),
@@ -136,6 +188,7 @@ const AdminRestaurants = () => {
     setDialogOpen(false);
     setEditingId(null);
     setForm({ ...defaultForm, country_id: Number(localStorage.getItem("country_id") || 1) });
+    resetImage();
     loadRestaurants();
   };
 
@@ -195,7 +248,7 @@ const AdminRestaurants = () => {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "Modifier le restaurant" : "Ajouter un restaurant"}</DialogTitle>
           </DialogHeader>
@@ -237,8 +290,25 @@ const AdminRestaurants = () => {
               <Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>Image URL</Label>
-              <Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />
+              <Label>Image du restaurant</Label>
+              {imagePreview ? (
+                <div className="relative h-40 w-full max-w-xs overflow-hidden rounded-lg border">
+                  <img src={imagePreview} alt="Aperçu du restaurant" className="h-full w-full object-cover" />
+                  <Button type="button" variant="destructive" size="icon" className="absolute right-2 top-2" onClick={removeImage}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-40 w-full max-w-xs flex-col items-center justify-center rounded-lg border-2 border-dashed text-muted-foreground hover:border-primary"
+                >
+                  <ImageIcon className="mb-2 h-9 w-9" />
+                  <span className="text-xs">JPG, PNG, WebP<br />5 Mo maximum</span>
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={selectImage} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Description</Label>

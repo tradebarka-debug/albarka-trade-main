@@ -47,6 +47,7 @@ const AdminLayout = () => {
     { prefix: "/admin/fast-food", permission: "manage_restaurants" },
     { prefix: "/admin/admin-partners", permission: "manage_suppliers" },
     { prefix: "/admin/fournisseurs", permission: "manage_suppliers" },
+    { prefix: "/admin/usines", permission: "manage_factories" },
   ];
   const restrictedRoute = restrictedAdminRoutes.find((route) =>
     location.pathname.startsWith(route.prefix)
