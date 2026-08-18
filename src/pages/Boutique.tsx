@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Filter, Loader2 } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
@@ -6,6 +6,7 @@ import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import StockIndicator from "@/components/boutique/StockIndicator";
 import { findPromoPartner, calculateCommission } from "@/utils/promoCode";
+import { supabase } from "@/integrations/supabase/client";
 
 const Boutique = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -13,6 +14,17 @@ const Boutique = () => {
   const { products, isLoading } = useProducts();
   const [promoCode, setPromoCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [supplierNames, setSupplierNames] = useState<Record<number, string>>({});
+  const countryName = Number(localStorage.getItem("country_id") || "1") === 2 ? "Côte d’Ivoire" : "Burkina Faso";
+
+  useEffect(() => {
+    const loadSuppliers = async () => {
+      const { data } = await (supabase.from("suppliers") as any).select("id, company_name");
+      setSupplierNames(Object.fromEntries((data ?? []).map((supplier: any) => [supplier.id, supplier.company_name])));
+    };
+    void loadSuppliers();
+  }, []);
 
   // Extraire les catégories uniques des produits de la base de données
   const categories = useMemo(() => {
@@ -37,13 +49,14 @@ const Boutique = () => {
       return null;
       };
   const handleAddToCart = (product: Product) => {
+    const quantity = Math.max(1, quantities[product.id] || 1);
     addItem({
       id: product.id,
       name: product.name,
       price: product.price,
-      image: product.image || "/placeholder.svg",
+      image: product.image_url || product.image || "/placeholder.svg",
       unit: product.unit || "",
-    });
+    }, quantity);
     toast.success(`${product.name} ajouté au panier`);
   };
 
@@ -161,11 +174,14 @@ className="w-full p-3 rounded-lg border border-yellow-500 bg-black text-white"
                     </h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-1">
-                    Format : {product.unit?.replace(/format:/gi, "").trim()}
+                    Conditionnement : {product.unit?.replace(/format:/gi, "").trim() || "Non précisé"}
                   </p>
+                  <p className="text-sm text-muted-foreground mb-1">Pays : {countryName}</p>
+                  <p className="text-sm text-muted-foreground mb-1">Fournisseur : {product.supplier_id ? supplierNames[product.supplier_id] || "Non précisé" : "Albarka Trade"}</p>
                   <div className="mb-3">
                     <StockIndicator quantity={product.stock_quantity} inStock={product.in_stock} />
                   </div>
+                  <p className={`mb-3 text-sm font-medium ${product.in_stock ? "text-green-600" : "text-destructive"}`}>{product.in_stock ? "Disponibilité : En stock" : "Disponibilité : Rupture de stock"}</p>
                   <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                     {product.description}
                   </p>
@@ -173,16 +189,10 @@ className="w-full p-3 rounded-lg border border-yellow-500 bg-black text-white"
                     <p className="text-xl font-bold text-primary">
                       {formatPrice(product.price)}
                     </p>
-                    <Button
-                      size="sm"
-                      variant="orangeMoney"
-                      onClick={() => handleAddToCart(product)}
-                      disabled={!product.in_stock}
-                      className="gap-2"
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                      Ajouter
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <input aria-label={`Quantité pour ${product.name}`} type="number" min="1" max={Math.max(1, product.stock_quantity)} value={quantities[product.id] || 1} onChange={(event) => setQuantities({ ...quantities, [product.id]: Math.max(1, Math.min(product.stock_quantity || 1, Number(event.target.value) || 1)) })} className="h-9 w-14 rounded-md border bg-background px-2 text-sm" disabled={!product.in_stock} />
+                      <Button size="sm" variant="orangeMoney" onClick={() => handleAddToCart(product)} disabled={!product.in_stock} className="gap-2"><ShoppingCart className="w-4 h-4" />Ajouter</Button>
+                    </div>
                   </div>
                 </div>
               </div>

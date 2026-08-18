@@ -13,7 +13,8 @@ import {
   Bus,
   UtensilsCrossed,
   Factory,
-  ClipboardList
+  ClipboardList,
+  ImageIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import { useState } from "react";
 const menuItems = [
   { path: "/admin", label: "Tableau de bord", icon: LayoutDashboard },
   { path: "/admin/produits", label: "Produits", icon: Package },
+  { path: "/admin/produits-qualite", label: "Nos produits de qualité", icon: Package },
   { path: "/admin/fast-food", label: "Menu Fast Food", icon: UtensilsCrossed, permission: "manage_restaurants" },
   { path: "/admin/restaurants", label: "Restaurants partenaires", icon: UtensilsCrossed, permission: "manage_restaurants" },
   { path: "/admin/menus", label: "Menus restaurants", icon: UtensilsCrossed, permission: "manage_restaurants" },
@@ -34,9 +36,13 @@ const menuItems = [
   { path: "/admin/paiements", label: "Paiements", icon: CreditCard },
   { path: "/admin/service-requests", label: "Demandes de services", icon: Wrench },
   { path: "/admin/orders", label: "Commandes", icon: Package },
+  { path: "/admin/demandes-partenaires", label: "Demandes partenaires", icon: ClipboardList },
   { path: "/admin/liquidation", label: "Liquidation", icon: Package },
+  { path: "/admin/slides-accueil", label: "Slides accueil", icon: ImageIcon },
   { path: "/admin/admin-partners", label: "Fournisseurs", icon: Users, permission: "manage_suppliers" },
+  { path: "/admin/fournisseurs/produits", label: "Produits fournisseurs", icon: Package, permission: "manage_suppliers" },
   { path: "/admin/usines", label: "Usines partenaires", icon: Factory, permission: "manage_factories" },
+  { path: "/admin/usines/produits", label: "Produits des usines", icon: Package, permission: "manage_factories" },
   { path: "/admin/repertoire-partenaires", label: "Répertoire partenaires", icon: ClipboardList },
   { path: "/admin/voyages", label: "Voyages & Courriers", icon: Bus },
   { path: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
@@ -59,7 +65,7 @@ const AdminSidebar = () => {
     if (path === "/admin") {
       return location.pathname === "/admin";
     }
-    return location.pathname.startsWith(path);
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   return (

@@ -27,7 +27,6 @@ import { toast } from "sonner";
 const Voyages = () => {
   const selectedCountry =
     Number(localStorage.getItem("country_id")) || 1;
-  console.log("selectedCountry =", selectedCountry);
   const { data: routes = [] } = useQuery({
     queryKey: ["routes", selectedCountry],
     queryFn: async () => {
@@ -43,7 +42,6 @@ const Voyages = () => {
         .eq("country_id", selectedCountry);
 
       if (error) throw error;
-      console.log("ROUTES =", data);
       return data;
     },
   });
@@ -56,7 +54,7 @@ const Voyages = () => {
         .select("*")
         .order("name");
       if (error) {
-        console.log(error);
+        console.error(error);
         throw error;
       }
       return data;
@@ -100,9 +98,7 @@ const Voyages = () => {
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    console.log("name =", name);
-    console.log("value =", value);
-    let updatedForm = {
+    const updatedForm = {
       ...formData,
       [name]: value,
     };
@@ -115,7 +111,6 @@ const Voyages = () => {
       const companyRoutes = routes.filter(
         (r: any) => String(r.transport_companies?.id) === value
       );
-      console.log("availableRoutes =", companyRoutes);
       setAvailableRoutes(companyRoutes);
 
       updatedForm.departure = "";
@@ -155,8 +150,6 @@ const selectedRoute = routes.find(
     String(r.transport_companies?.id) === formData.company
 );
 
-console.log("selectedRoute =", selectedRoute);
-console.log("voyage_id =", selectedRoute?.voyage_id);
     const { data, error } = await supabase
       .from("bookings")
       .insert([

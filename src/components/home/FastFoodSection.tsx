@@ -85,6 +85,7 @@ const FastFoodSection = () => {
   Number(localStorage.getItem("country_id")) || 1
 );
   const [restaurants, setRestaurants] = useState(restaurantsData);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollTimerRef = useRef<number | null>(null);
@@ -139,14 +140,15 @@ const FastFoodSection = () => {
     const fetchRestaurants = async () => {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("restaurant_partners" as any)
-        .select("*")
-        .eq("country_id", selectedCountry);
+      const [{ data, error }, { data: menuData, error: menuError }] = await Promise.all([
+        supabase.from("restaurant_partners" as any).select("*").eq("country_id", selectedCountry).eq("is_active", true).order("display_order"),
+        supabase.from("restaurant_menu_items" as any).select("*").eq("country_id", selectedCountry).eq("is_available", true),
+      ]);
 
       if (!error && data) {
         setRestaurants(data as any);
       }
+      if (!menuError && menuData) setMenuItems(menuData as any[]);
 
       setLoading(false);
     };
@@ -184,7 +186,7 @@ const FastFoodSection = () => {
         </div>
         <div className="flex justify-center -mt-2 mb-6">
           <Link
-            to="/restaurant/delice"
+            to="/fast-food"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition hover:opacity-90"
           >
             Découvrir nos restaurants partenaires
@@ -214,7 +216,9 @@ const FastFoodSection = () => {
             scrollBehavior: "smooth"
           }}
         >
-          {restaurants.map((restaurant, index) => (
+          {restaurants.map((restaurant: any, index) => {
+            const restaurantMenu = menuItems.filter((item) => String(item.restaurant_id) === String(restaurant.id));
+            return (
             <a
 
               key={index}
@@ -236,12 +240,27 @@ const FastFoodSection = () => {
                   {restaurant.description}
                 </p>
 
+                {restaurantMenu.length > 0 && (
+                  <div className="mt-4 rounded-xl bg-background/70 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">Menu disponible</p>
+                    <div className="space-y-2">
+                      {restaurantMenu.slice(0, 3).map((item) => (
+                        <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="truncate text-foreground">{item.name}</span>
+                          <span className="shrink-0 font-semibold text-primary">{new Intl.NumberFormat("fr-FR").format(Number(item.price) || 0)} FCFA</span>
+                        </div>
+                      ))}
+                    </div>
+                    {restaurantMenu.length > 3 && <p className="mt-2 text-xs text-muted-foreground">+ {restaurantMenu.length - 3} autre(s) plat(s)</p>}
+                  </div>
+                )}
+
                 <button className="mt-5 w-full bg-yellow-400 text-black py-3 rounded-xl font-bold">
                   Voir les plats
                 </button>
               </div>
             </a>
-          ))}
+          )})}
         </div>
 
       </div>

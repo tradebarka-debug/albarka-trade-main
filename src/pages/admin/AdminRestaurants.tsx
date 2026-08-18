@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ImageIcon, X } from "lucide-react";
+import { Copy, Download, ImageIcon, QrCode, X } from "lucide-react";
+import QRCode from "react-qr-code";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,16 @@ type RestaurantPartnerRow = {
   location: string | null;
   hours: string | null;
   telephone: string | null;
+  whatsapp?: string | null;
+  payment_phone?: string | null;
+  payment_beneficiary?: string | null;
+  delivery_fee?: number | null;
+  delivery_fee_per_km?: number | null;
+  disposable_kit_fee?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  estimated_delivery_time?: string | null;
+  is_available?: boolean | null;
   category: string | null;
   country: string | null;
   country_id: number | null;
@@ -34,6 +45,16 @@ const defaultForm = {
   location: "",
   hours: "",
   telephone: "",
+  whatsapp: "",
+  payment_phone: "",
+  payment_beneficiary: "",
+  delivery_fee: 0,
+  delivery_fee_per_km: 0,
+  disposable_kit_fee: 0,
+  latitude: "",
+  longitude: "",
+  estimated_delivery_time: "",
+  is_available: true,
   category: "Restaurant",
   country: "Burkina Faso",
   country_id: 1,
@@ -47,6 +68,7 @@ const AdminRestaurants = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [qrRestaurant, setQrRestaurant] = useState<RestaurantPartnerRow | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +118,16 @@ const AdminRestaurants = () => {
       location: restaurant.location || "",
       hours: restaurant.hours || "",
       telephone: restaurant.telephone || "",
+      whatsapp: restaurant.whatsapp || "",
+      payment_phone: restaurant.payment_phone || "",
+      payment_beneficiary: restaurant.payment_beneficiary || "",
+      delivery_fee: restaurant.delivery_fee ?? 0,
+      delivery_fee_per_km: restaurant.delivery_fee_per_km ?? 0,
+      disposable_kit_fee: restaurant.disposable_kit_fee ?? 0,
+      latitude: restaurant.latitude != null ? String(restaurant.latitude) : "",
+      longitude: restaurant.longitude != null ? String(restaurant.longitude) : "",
+      estimated_delivery_time: restaurant.estimated_delivery_time || "",
+      is_available: restaurant.is_available ?? true,
       category: restaurant.category || "Restaurant",
       country: restaurant.country || "Burkina Faso",
       country_id: restaurant.country_id || Number(localStorage.getItem("country_id") || 1),
@@ -160,6 +192,16 @@ const AdminRestaurants = () => {
       location: form.location.trim(),
       hours: form.hours.trim(),
       telephone: form.telephone.trim(),
+      whatsapp: form.whatsapp.trim(),
+      payment_phone: form.payment_phone.trim(),
+      payment_beneficiary: form.payment_beneficiary.trim(),
+      delivery_fee: Number(form.delivery_fee) || 0,
+      delivery_fee_per_km: Number(form.delivery_fee_per_km) || 0,
+      disposable_kit_fee: Number(form.disposable_kit_fee) || 0,
+      latitude: form.latitude === "" ? null : Number(form.latitude),
+      longitude: form.longitude === "" ? null : Number(form.longitude),
+      estimated_delivery_time: form.estimated_delivery_time.trim(),
+      is_available: form.is_available,
       category: form.category.trim(),
       country: form.country.trim(),
       country_id: Number(form.country_id),
@@ -207,6 +249,27 @@ const AdminRestaurants = () => {
     loadRestaurants();
   };
 
+  const restaurantUrl = qrRestaurant?.slug
+    ? `${window.location.origin}/restaurant/${qrRestaurant.slug}${qrRestaurant.country_id ? `?country=${qrRestaurant.country_id}` : ""}`
+    : "";
+
+  const copyRestaurantUrl = async () => {
+    await navigator.clipboard.writeText(restaurantUrl);
+    toast.success("Lien du restaurant copié");
+  };
+
+  const downloadQrCode = () => {
+    const svg = document.getElementById("restaurant-qr-code");
+    if (!svg || !qrRestaurant) return;
+    const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `qr-${qrRestaurant.slug || "restaurant"}.svg`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-6 md:p-8 space-y-6">
       <Card>
@@ -236,8 +299,9 @@ const AdminRestaurants = () => {
                     <span className="text-xs rounded-full bg-muted px-2 py-1">{restaurant.country}</span>
                     <span className="text-xs rounded-full bg-muted px-2 py-1">{restaurant.is_active ? "Actif" : "Inactif"}</span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => openEdit(restaurant)}>Modifier</Button>
+                    <Button variant="outline" size="sm" className="gap-1" onClick={() => setQrRestaurant(restaurant)} disabled={!restaurant.slug}><QrCode className="h-4 w-4" /> QR et lien</Button>
                     <Button variant="destructive" size="sm" onClick={() => deleteRestaurant(restaurant.id)}>Supprimer</Button>
                   </div>
                 </div>
@@ -278,8 +342,45 @@ const AdminRestaurants = () => {
               <Input value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} />
             </div>
             <div className="space-y-2">
+              <Label>WhatsApp du restaurant</Label>
+              <Input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="22670000000" />
+            </div>
+            <div className="space-y-2">
+              <Label>Numéro de réception des paiements</Label>
+              <Input value={form.payment_phone} onChange={(e) => setForm({ ...form, payment_phone: e.target.value })} placeholder="Ex. +225 01 23 45 67 89" />
+              <p className="text-xs text-muted-foreground">Numéro Mobile Money affiché aux clients avant l'activation de CinetPay.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Nom du bénéficiaire du paiement</Label>
+              <Input value={form.payment_beneficiary} onChange={(e) => setForm({ ...form, payment_beneficiary: e.target.value })} placeholder="Nom affiché sur le compte Mobile Money" />
+            </div>
+            <div className="space-y-2">
               <Label>Heures</Label>
               <Input value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Frais de livraison (FCFA)</Label>
+              <Input type="number" min="0" value={form.delivery_fee} onChange={(e) => setForm({ ...form, delivery_fee: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tarif par kilomètre (FCFA)</Label>
+              <Input type="number" min="0" value={form.delivery_fee_per_km} onChange={(e) => setForm({ ...form, delivery_fee_per_km: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Prix d'un kit jetable (FCFA)</Label>
+              <Input type="number" min="0" value={form.disposable_kit_fee} onChange={(e) => setForm({ ...form, disposable_kit_fee: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Latitude du restaurant</Label>
+              <Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="12.3714" />
+            </div>
+            <div className="space-y-2">
+              <Label>Longitude du restaurant</Label>
+              <Input type="number" step="any" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="-1.5197" />
+            </div>
+            <div className="space-y-2">
+              <Label>Temps estimé</Label>
+              <Input value={form.estimated_delivery_time} onChange={(e) => setForm({ ...form, estimated_delivery_time: e.target.value })} placeholder="30 à 45 min" />
             </div>
             <div className="space-y-2">
               <Label>Pays</Label>
@@ -288,6 +389,10 @@ const AdminRestaurants = () => {
             <div className="space-y-2">
               <Label>Ordre affichage</Label>
               <Input type="number" value={form.display_order} onChange={(e) => setForm({ ...form, display_order: Number(e.target.value) })} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3 md:col-span-2">
+              <div><Label>Disponible pour les commandes</Label><p className="text-sm text-muted-foreground">Les clients pourront ajouter les plats au panier.</p></div>
+              <Switch checked={form.is_available} onCheckedChange={(is_available) => setForm({ ...form, is_available })} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Image du restaurant</Label>
@@ -326,6 +431,26 @@ const AdminRestaurants = () => {
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
             <Button onClick={saveRestaurant}>Sauvegarder</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(qrRestaurant)} onOpenChange={(open) => !open && setQrRestaurant(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>QR code de {qrRestaurant?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 text-center">
+            <p className="text-sm text-muted-foreground">Le client scanne ce code et arrive directement sur la page et le menu de ce restaurant.</p>
+            <div className="mx-auto w-fit rounded-2xl border bg-white p-5">
+              {restaurantUrl && <QRCode id="restaurant-qr-code" value={restaurantUrl} size={220} />}
+            </div>
+            <div className="rounded-lg border bg-muted/40 p-3 text-left text-sm break-all">{restaurantUrl}</div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button variant="outline" className="gap-2" onClick={copyRestaurantUrl}><Copy className="h-4 w-4" />Copier le lien</Button>
+              <Button className="gap-2" onClick={downloadQrCode}><Download className="h-4 w-4" />Télécharger le QR</Button>
+            </div>
+            {window.location.hostname === "localhost" && <p className="text-xs text-amber-700">Attention : ce QR utilise actuellement localhost. Sur le site publié, il utilisera automatiquement l’adresse publique du site.</p>}
           </div>
         </DialogContent>
       </Dialog>

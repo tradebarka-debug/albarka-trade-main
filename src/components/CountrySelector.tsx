@@ -1,93 +1,21 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+type Country = { id: number; name: string; iso_code: string | null };
+const flags: Record<string, string> = { BF: "🇧🇫", CI: "🇨🇮", ML: "🇲🇱", NE: "🇳🇪", TG: "🇹🇬", BJ: "🇧🇯", GH: "🇬🇭", SN: "🇸🇳", GN: "🇬🇳", NG: "🇳🇬" };
 
 export default function CountrySelector() {
   const [open, setOpen] = useState(false);
-
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [search, setSearch] = useState("");
   useEffect(() => {
-    const syncCountry = () => {
-      const country = localStorage.getItem("country_id");
-      setOpen(!country);
-    };
-
-    syncCountry();
-
-    window.addEventListener("country-changed", syncCountry);
-    window.addEventListener("storage", syncCountry);
-
-    return () => {
-      window.removeEventListener("country-changed", syncCountry);
-      window.removeEventListener("storage", syncCountry);
-    };
+    const sync = () => setOpen(!localStorage.getItem("country_id"));
+    sync(); window.addEventListener("country-changed", sync); window.addEventListener("storage", sync);
+    void (async () => { const { data, error } = await (supabase.from("countries") as any).select("id,name,iso_code").order("name"); if (error) console.error("Impossible de charger les pays", error); setCountries(data || []); })();
+    return () => { window.removeEventListener("country-changed", sync); window.removeEventListener("storage", sync); };
   }, []);
-
-  const selectCountry = (id: number) => {
-    localStorage.setItem("selectedCountry", id.toString());
-    localStorage.setItem("country_id", id.toString());
-    window.dispatchEvent(new CustomEvent("country-changed"));
-    setOpen(false);
-    window.location.reload();
-  };
-
+  const select = (id: number) => { localStorage.setItem("country_id", String(id)); window.dispatchEvent(new CustomEvent("country-changed")); setOpen(false); window.location.reload(); };
   if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-auto p-8 relative">
-
-        {/* En-tête */}
-        <div className="flex-1 text-center">
-
-          <img
-            src="/maskable-icon.png"
-            alt="Albarka Trade"
-           className="w-16 h-16 object-contain mt-12"
-          />
-
-          <div>
-            <h1 className="text-3xl font-bold text-green-900 text-center leading-tight">
-              Bienvenue sur
-              <br />
-              Albarka Trade
-            </h1>
-
-            <p className="text-center text-lg text-gray-600 mt-3 leading-7">
-              La plateforme de référence
-              <br />
-              pour acheter, vendre et développer votre activité.
-            </p>
-
-          </div>
-
-
-        </div>
-        {/* Description */}
-        <p className="text-center text-gray-600 mt-8 mb-8 text-lg">
-          Sélectionnez votre pays pour continuer.
-        </p>
-
-        {/* Burkina Faso */}
-        <button
-          type="button"
-          onClick={() => selectCountry(1)}
-          className="w-full py-4 rounded-xl bg-green-700 hover:bg-green-800 shadow-lg hover:scale-105 transition-all duration-300 text-white font-bold text-xl mb-4"
-        >
-          🇧🇫 Burkina Faso
-        </button>
-
-        {/* Côte d'Ivoire */}
-        <button
-          type="button"
-          onClick={() => selectCountry(2)}
-          className="w-full py-4 rounded-xl bg-orange-600 hover:bg-orange-700 shadow-lg hover:scale-105 transition-all duration-300 text-white font-bold text-xl"
-        >
-          🇨🇮 Côte d'Ivoire
-        </button>
-        {/* Pied */}
-        <p className="text-center text-xs text-gray-400 mt-8">
-          © Albarka Trade International
-        </p>
-
-      </div>
-    </div>
-  );
+  const visibleCountries = countries.filter((country) => country.name.toLowerCase().includes(search.trim().toLowerCase()));
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"><div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"><h1 className="text-center text-2xl font-bold text-green-950">Choisissez votre pays</h1><p className="mt-2 text-center text-sm text-gray-600">Recherchez puis cliquez sur votre pays.</p><input autoFocus value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un pays..." className="mt-5 h-12 w-full rounded-xl border border-gray-300 px-4 text-gray-900 outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20" /><div className="mt-4 grid max-h-80 gap-2 overflow-y-auto sm:grid-cols-2">{visibleCountries.map((country) => <button key={country.id} type="button" onClick={() => select(country.id)} className="rounded-xl border border-gray-200 px-4 py-3 text-left font-semibold text-gray-900 transition hover:border-green-700 hover:bg-green-50">{flags[country.iso_code || ""] || "🌍"} {country.name}</button>)}</div>{countries.length === 0 && <p className="mt-6 text-center text-sm text-gray-500">Chargement des pays disponibles…</p>}{countries.length > 0 && visibleCountries.length === 0 && <p className="mt-6 text-center text-sm text-gray-500">Aucun pays trouvé.</p>}</div></div>;
 }

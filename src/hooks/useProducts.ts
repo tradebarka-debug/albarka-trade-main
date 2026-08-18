@@ -18,6 +18,9 @@ export interface Product {
   liquidation_price?: number | null;
   liquidation_until?: string | null;
   country_id?: number | null;
+  supplier_id?: number | null;
+  is_home_featured?: boolean;
+  home_sort_order?: number | null;
   created_at?: string;
   updated_at?: string;
 }
