@@ -1,19 +1,15 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, ShoppingCart, Phone, LogIn, LogOut, User, Settings } from "lucide-react";
+import { Menu, X, ShoppingCart, Phone, Search, LogIn, LogOut, User, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import logoAlbarka from "@/assets/logo-albarka.jpeg";
-import CountrySelector from "@/components/CountrySelector";
 import CountryDropdown from "@/components/CountryDropdown";
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  const countryId = Number(localStorage.getItem("country_id")) || 1;
-  const phoneNumber = countryId === 2 ? "+225 07 14 14 66 30" : "+226 02 02 94 94";
-  const phoneHref = countryId === 2 ? "tel:+2250714146630" : "tel:+22602029494";
   const {
     totalItems
   } = useCart();
@@ -30,28 +26,25 @@ const Header = () => {
     label: "Accueil"
   }, {
     path: "/boutique",
-    label: "Produits Alimentaires"
+    label: "Acheter"
+  }, {
+    path: "/livraisons",
+    label: "Livraison"
+  }, {
+    path: "/suivi-livraison",
+    label: "Mon suivi"
   }, {
     path: "/services",
     label: "Services"
   }, {
-    path: "/voyages",
-    label: "Voyages & Courriers"
-  }, {
-    path: "/fast-food",
-    label: "Fast Food"
+    path: "/suppliers",
+    label: "Partenaires"
   }, {
     path: "/formations",
     label: "Formations"
   }, {
-    path: "/formation-vente",
-    label: "Formation Vente"
-  }, {
     path: "/recrutement",
     label: "Recrutement"
-  }, {
-    path: "/contact",
-    label: "Contact"
   }];
   const isActive = (path: string) => location.pathname === path;
   const handleSignOut = async () => {
@@ -85,10 +78,8 @@ const Header = () => {
           <div className="hidden md:block">
             <CountryDropdown />
           </div>
-          <a href={phoneHref} className="hidden md:flex items-center gap-2 text-xs whitespace-nowrap text-muted-foreground hover:text-primary transition-colors">
-            <Phone className="w-4 h-4" />
-            <span>{phoneNumber}</span>
-          </a>
+          <Link to="/#recherche" className="hidden md:block"><Button variant="ghost" size="icon" aria-label="Rechercher"><Search className="w-5 h-5" /></Button></Link>
+          <Link to="/contact" className="hidden md:block"><Button variant="ghost" size="icon" aria-label="Contact"><Phone className="w-5 h-5" /></Button></Link>
 
           <Link to="/panier" className="relative">
             <Button variant="ghost" size="icon" className="relative">
@@ -192,10 +183,10 @@ const Header = () => {
             Connexion
           </Link>}
 
-          <a href={phoneHref} className="flex items-center gap-2 px-4 py-3 text-base text-muted-foreground hover:text-primary transition-colors">
+          <Link to="/contact" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-base text-muted-foreground hover:text-primary transition-colors">
             <Phone className="w-5 h-5" />
-            <span>{phoneNumber}</span>
-          </a>
+            <span>Contact</span>
+          </Link>
         </div>
       </nav>}
     </div>

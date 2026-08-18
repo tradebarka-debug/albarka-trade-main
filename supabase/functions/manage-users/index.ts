@@ -554,6 +554,9 @@ Deno.serve(async (req) => {
           isSystemAdmin ||
           (isManagementRole && isInRequesterScope(profile.organization_id, profile.country_id)) ||
           canManageProfile(profile) ||
+          (hasPermission("manage_team_accounts") &&
+            ["commercial", "agent_commercial", "agent_commerciale", "commercial_agent", "sales_agent"].includes(String(profile.role || "").toLowerCase()) &&
+            isInRequesterScope(profile.organization_id, profile.country_id)) ||
           canApprovePendingPartner(profile) ||
           profile.id === currentUser.id
         )

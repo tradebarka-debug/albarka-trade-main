@@ -37,7 +37,7 @@ const Panier = () => {
   }
 
   return (
-    <main className="min-h-screen py-12 md:py-16">
+    <main className="min-h-screen pb-28 pt-6 md:py-16">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
@@ -112,7 +112,7 @@ const Panier = () => {
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
-              <div className="bg-card rounded-xl p-6 shadow-sm border border-border sticky top-24">
+              <div className="sticky bottom-16 rounded-xl border border-border bg-card p-5 shadow-lg lg:top-24 lg:p-6">
                 <h2 className="font-semibold text-lg mb-4">Résumé de la commande</h2>
                 
                 <div className="space-y-3 mb-6">
@@ -143,7 +143,7 @@ const Panier = () => {
                 </Link>
 
                 <p className="text-xs text-muted-foreground text-center mt-4">
-                  Paiement sécurisé via Orange Money
+                  Paiement à la livraison, Orange Money, Wave ou Moov Money
                 </p>
               </div>
             </div>

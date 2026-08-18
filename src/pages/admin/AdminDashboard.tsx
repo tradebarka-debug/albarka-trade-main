@@ -1,8 +1,10 @@
-import { Package, GraduationCap, Wrench, Briefcase, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Package, GraduationCap, Wrench, Briefcase, TrendingUp, ShoppingCart, Truck, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
-const stats = [
+const baseStats = [
   { 
     label: "Produits", 
     value: "24", 
@@ -38,6 +40,23 @@ const stats = [
 ];
 
 const AdminDashboard = () => {
+  const [metrics, setMetrics] = useState({ products: 0, restaurants: 0, suppliers: 0, orders: 0, deliveries: 0, revenue: 0, partners: 0 });
+  useEffect(() => {
+    const loadMetrics = async () => {
+      const countryId = Number(localStorage.getItem("country_id")) || 1;
+      const [products, restaurants, suppliers, orders, partners] = await Promise.all([
+        (supabase.from("products") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId),
+        (supabase.from("restaurant_partners") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId).eq("is_active", true),
+        (supabase.from("suppliers") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId).eq("status", "active"),
+        (supabase.from("orders") as any).select("total, delivery_status").eq("country_id", countryId),
+        (supabase.from("partner_applications") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId).eq("status", "approved"),
+      ]);
+      const orderRows = orders.data || [];
+      setMetrics({ products: products.count || 0, restaurants: restaurants.count || 0, suppliers: suppliers.count || 0, orders: orderRows.length, deliveries: orderRows.filter((order: any) => order.delivery_status === "delivered").length, revenue: orderRows.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0), partners: partners.count || 0 });
+    };
+    void loadMetrics();
+  }, []);
+  const stats = baseStats.map((stat) => ({ ...stat, value: stat.label === "Produits" ? String(metrics.products) : stat.value }));
   return (
     <div className="p-6 md:p-8 space-y-8">
       {/* Header */}
@@ -46,6 +65,10 @@ const AdminDashboard = () => {
         <p className="text-muted-foreground mt-1">
           Bienvenue dans votre espace d'administration
         </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Metric label="Commandes" value={metrics.orders} icon={ShoppingCart} /><Metric label="Chiffre d'affaires" value={`${new Intl.NumberFormat("fr-FR").format(metrics.revenue)} FCFA`} icon={TrendingUp} /><Metric label="Restaurants actifs" value={metrics.restaurants} icon={Briefcase} /><Metric label="Fournisseurs actifs" value={metrics.suppliers} icon={Users} /><Metric label="Partenaires" value={metrics.partners} icon={Users} /><Metric label="Livraisons terminées" value={metrics.deliveries} icon={Truck} />
       </div>
 
       {/* Stats Grid */}
@@ -125,5 +148,7 @@ const AdminDashboard = () => {
     </div>
   );
 };
+
+const Metric = ({ label, value, icon: Icon }: { label: string; value: string | number; icon: any }) => <Card><CardContent className="p-4"><Icon className="h-4 w-4 text-primary" /><p className="mt-2 text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-bold leading-tight">{value}</p></CardContent></Card>;
 
 export default AdminDashboard;

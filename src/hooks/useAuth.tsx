@@ -40,17 +40,19 @@ const managementRoleCodes = new Set([
 ]);
 
 const rolePermissionDefaults: Record<string, string[]> = {
-  general_management: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  directeur_general: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  directeur_generale: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  directeur_commercial: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  direction_commerciale: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  responsable_commercial: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  commercial_manager: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  agent_commercial: ['access_admin', 'create_partners', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  agent_commerciale: ['access_admin', 'create_partners', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  commercial_agent: ['access_admin', 'create_partners', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
-  sales_agent: ['access_admin', 'create_partners', 'manage_restaurants', 'manage_suppliers', 'manage_factories'],
+  general_management: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'review_partners', 'manage_commercial_content', 'manage_operations', 'view_sales_reports'],
+  directeur_general: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'review_partners', 'manage_commercial_content', 'manage_operations', 'view_sales_reports'],
+  directeur_generale: ['access_admin', 'create_users', 'manage_team_accounts', 'view_team_overview', 'review_partners', 'manage_commercial_content', 'manage_operations', 'view_sales_reports'],
+  directeur_marketing: ['access_admin', 'manage_commercial_content', 'view_sales_reports'],
+  direction_marketing: ['access_admin', 'manage_commercial_content', 'view_sales_reports'],
+  directeur_commercial: ['access_admin', 'manage_team_accounts', 'review_partners', 'view_sales_reports'],
+  direction_commerciale: ['access_admin', 'manage_team_accounts', 'review_partners', 'view_sales_reports'],
+  responsable_commercial: ['access_admin', 'manage_team_accounts', 'review_partners', 'view_sales_reports'],
+  commercial_manager: ['access_admin', 'manage_team_accounts', 'review_partners', 'view_sales_reports'],
+  agent_commercial: ['access_admin', 'create_partners'],
+  agent_commerciale: ['access_admin', 'create_partners'],
+  commercial_agent: ['access_admin', 'create_partners'],
+  sales_agent: ['access_admin', 'create_partners'],
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

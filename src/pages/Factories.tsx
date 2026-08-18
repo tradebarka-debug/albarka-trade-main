@@ -1,0 +1,11 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Factory, MapPin, BadgeCheck } from "lucide-react";
+import BackButton from "@/components/BackButton";
+import { supabase } from "@/integrations/supabase/client";
+
+export default function Factories() {
+  const [factories, setFactories] = useState<any[]>([]); const navigate = useNavigate();
+  useEffect(() => { void (async () => { const { data } = await (supabase.from("factories") as any).select("*").eq("status", "active").order("company_name"); setFactories(data || []); })(); }, []);
+  return <main className="container mx-auto px-4 py-10"><BackButton /><div className="mx-auto max-w-3xl text-center"><span className="text-sm font-semibold uppercase tracking-wider text-primary">Réseau partenaires</span><h1 className="mt-3 text-3xl font-bold md:text-4xl">Usines partenaires</h1><p className="mt-3 text-muted-foreground">Découvrez les informations et produits de nos partenaires industriels.</p></div><div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{factories.map((factory) => <button key={factory.id} onClick={() => navigate(`/factories/${factory.id}`)} className="overflow-hidden rounded-2xl border border-border bg-card text-left transition hover:-translate-y-1 hover:shadow-lg"><div className="flex h-44 items-center justify-center bg-muted p-5">{factory.logo ? <img src={factory.logo} alt={factory.company_name} className="h-full w-full object-contain" /> : <Factory className="h-12 w-12 text-muted-foreground" />}</div><div className="p-5"><div className="flex items-center gap-2"><h2 className="font-bold">{factory.company_name}</h2>{factory.certified && <BadgeCheck className="h-4 w-4 text-primary" />}</div><p className="mt-2 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{[factory.city, factory.country].filter(Boolean).join(", ") || "Localisation à confirmer"}</p><p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{factory.description}</p><p className="mt-4 text-sm font-semibold text-primary">Voir l’usine et ses produits</p></div></button>)}</div>{factories.length === 0 && <p className="mt-10 text-center text-muted-foreground">Aucune usine partenaire disponible.</p>}</main>;
+}

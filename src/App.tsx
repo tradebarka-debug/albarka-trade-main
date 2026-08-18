@@ -13,11 +13,16 @@ import Boutique from "./pages/Boutique";
 import AdminOrders from "@/pages/AdminOrders";
 import AdminSuppliers from "./pages/admin/AdminSuppliers";
 import AdminFactories from "./pages/admin/AdminFactories";
+import AdminFactoryProducts from "./pages/admin/AdminFactoryProducts";
+import AdminSupplierProducts from "./pages/admin/AdminSupplierProducts";
+import AdminHomeSlides from "./pages/admin/AdminHomeSlides";
 import AdminPartnersDirectory from "./pages/admin/AdminPartnersDirectory";
 import AdminRestaurants from "./pages/admin/AdminRestaurants";
 import RestaurantMenus from "./pages/admin/RestaurantMenus";
 import Panier from "./pages/Panier";
 import Paiement from "./pages/Paiement";
+import DeliveryTracking from "./pages/DeliveryTracking";
+import PartnerApplication from "./pages/PartnerApplication";
 import Services from "./pages/Services";
 import Voyages from "./pages/Voyages";
 import Recrutement from "./pages/Recrutement";
@@ -27,11 +32,15 @@ import Suivi from "./pages/admin/Suivi";
 import Formations from "./pages/Formations";
 import FormationVente from "./pages/FormationVente";
 import FastFood from "./pages/FastFood";
+import Restaurants from "./pages/Restaurants";
+import RestaurantPartners from "./pages/RestaurantPartners";
 import Liquidation from "./pages/Liquidation";
 import Livraisons from "./pages/Livraisons";
 import Auth from "./pages/Auth";
 import Suppliers from "./pages/Suppliers";
 import SupplierDetails from "./pages/SupplierDetails";
+import Factories from "./pages/Factories";
+import FactoryDetails from "./pages/FactoryDetails";
 import NotFound from "./pages/NotFound";
 import RestaurantPage from "./pages/RestaurantPage";
 import CountryDetector from "./components/CountryDetector";
@@ -62,6 +71,7 @@ import UserSpace from "@/pages/UserSpace";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
+import AdminHomeQualityProducts from "./pages/admin/AdminHomeQualityProducts";
 import AdminFormations from "./pages/admin/AdminFormations";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminJobs from "./pages/admin/AdminJobs";
@@ -72,6 +82,7 @@ import AdminFastFood from "./pages/admin/AdminFastFood";
 import AdminLiquidation from "./pages/admin/AdminLiquidation";
 import AdminApplications from "./pages/admin/AdminApplications";
 import AdminServiceRequests from "./pages/admin/AdminServiceRequests";
+import AdminPartnerApplications from "./pages/admin/AdminPartnerApplications";
 import OrganisationDashboard from "./pages/organisation/OrganisationDashboard";
 const queryClient = new QueryClient();
 
@@ -91,6 +102,7 @@ const App = () => (
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="produits" element={<AdminProducts />} />
+                <Route path="produits-qualite" element={<AdminHomeQualityProducts />} />
                 <Route path="fast-food" element={<AdminFastFood />} />
                 <Route path="restaurants" element={<AdminRestaurants />} />
                 <Route path="menus" element={<RestaurantMenus />} />
@@ -107,8 +119,12 @@ const App = () => (
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="admin-partners" element={<AdminSuppliers />} />
                 <Route path="fournisseurs" element={<AdminSuppliers />} />
+                <Route path="fournisseurs/produits" element={<AdminSupplierProducts />} />
                 <Route path="usines" element={<AdminFactories />} />
+                <Route path="usines/produits" element={<AdminFactoryProducts />} />
+                <Route path="slides-accueil" element={<AdminHomeSlides />} />
                 <Route path="repertoire-partenaires" element={<AdminPartnersDirectory />} />
+                <Route path="demandes-partenaires" element={<AdminPartnerApplications />} />
               </Route>
 
               <Route path="/organisation" element={<OrganisationDashboard />} />
@@ -194,6 +210,8 @@ const App = () => (
                         <Route path="/boutique" element={<Boutique />} />
                         <Route path="/panier" element={<Panier />} />
                         <Route path="/paiement" element={<Paiement />} />
+                        <Route path="/suivi-livraison" element={<DeliveryTracking />} />
+                        <Route path="/devenir-partenaire" element={<PartnerApplication />} />
                         <Route path="/services" element={<Services />} />
                         <Route path="/suivi" element={<Suivi />} />
                         <Route path="/voyages" element={<Voyages />} />
@@ -202,6 +220,8 @@ const App = () => (
                         <Route path="/formations" element={<Formations />} />
                         <Route path="/formation-vente" element={<FormationVente />} />
                         <Route path="/fast-food" element={<FastFood />} />
+                        <Route path="/restaurants" element={<Restaurants />} />
+                        <Route path="/restaurants-partenaires" element={<RestaurantPartners />} />
                         <Route path="/liquidation" element={<Liquidation />} />
                         <Route path="/livraisons" element={<Livraisons />} />
                         <Route path="/auth" element={<Auth />} />
@@ -209,6 +229,8 @@ const App = () => (
                         <Route path="/restaurant/:slug" element={<RestaurantPage />} />
                         <Route path="/suppliers" element={<Suppliers />} />
                         <Route path="/suppliers/:id" element={<SupplierDetails />} />
+                        <Route path="/factories" element={<Factories />} />
+                        <Route path="/factories/:id" element={<FactoryDetails />} />
                         <Route path="/representant-home" element={<RepresentantHome />} />
                         <Route path="/devenir-representant" element={<Representant />} />
                         <Route path="/connexion-representant" element={<ConnexionRepresentant />} />
