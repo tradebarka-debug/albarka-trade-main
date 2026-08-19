@@ -9,7 +9,6 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["neighbor-paso-radar-analytical.trycloudflare.com"],
   },
   plugins: [
     react(),

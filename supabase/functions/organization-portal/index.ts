@@ -5,7 +5,6 @@ const allowedOrigins = [
   "https://albarka-trade.lovable.app",
   "https://albarka-trade.com",
   "https://www.albarka-trade.com",
-  "https://neighbor-paso-radar-analytical.trycloudflare.com",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
@@ -310,7 +309,7 @@ Deno.serve(async (req) => {
         throw employeeProfileError;
       }
 
-      await Promise.all([
+      const setupResults = await Promise.all([
         supabaseAdmin.from("access_scopes").upsert({
           user_id: newUserId,
           organization_id: organizationId,
@@ -328,6 +327,12 @@ Deno.serve(async (req) => {
           details: { employee_user_id: newUserId, employee_name: fullName, role_id: roleId, role_code: employeeRole.code },
         }),
       ]);
+
+      const setupError = setupResults.find((result) => result.error)?.error;
+      if (setupError) {
+        await supabaseAdmin.auth.admin.deleteUser(newUserId);
+        throw setupError;
+      }
 
       return jsonResponse({ success: true, employee: { id: newUserId, nom: fullName, email, role: employeeRole } }, 201, corsHeaders);
     }

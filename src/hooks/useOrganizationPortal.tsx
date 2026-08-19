@@ -173,7 +173,7 @@ export function useOrganizationPortal() {
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") void refetch(true);
-    }, 10_000);
+    }, 30_000);
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refetch(true);
     };

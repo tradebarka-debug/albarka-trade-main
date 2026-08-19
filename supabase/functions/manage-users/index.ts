@@ -22,7 +22,6 @@ const allowedOrigins = [
   "https://albarka-trade.lovable.app",
   "https://albarka-trade.com",
   "https://www.albarka-trade.com",
-  "https://neighbor-paso-radar-analytical.trycloudflare.com",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
