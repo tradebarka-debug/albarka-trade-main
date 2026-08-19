@@ -12,12 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Store, Package, Users, LogOut, ImageIcon, X, UtensilsCrossed } from "lucide-react";
+import { Loader2, Plus, Store, Package, Users, LogOut, ImageIcon, X, UtensilsCrossed, ClipboardList, Wallet, TrendingUp, LocateFixed, MapPin } from "lucide-react";
 
 const emptyWarehouseForm = { id: null as number | null, name: "", address: "", latitude: "", longitude: "" };
 const emptyProductForm = { id: null as number | null, name: "", description: "", category: "", price: "", unit: "", image: "" };
 const emptyRestaurantForm = { name: "", description: "", location: "", hours: "", telephone: "", image_url: "" };
 const emptyMenuItemForm = { id: null as string | null, name: "", description: "", price: "", image_url: "", is_available: true };
+const emptyEmployeeForm = { full_name: "", email: "", password: "", organization_role_id: "", restaurant_outlet_id: "" };
+const emptyOutletForm = { id: null as number | null, name: "", neighborhood: "", address: "", telephone: "", is_active: true };
 
 async function uploadProductImage(file: File) {
   const extension = file.name.split(".").pop() || "png";
@@ -45,6 +47,7 @@ export default function OrganisationDashboard() {
 
   const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState(emptyWarehouseForm);
+  const [warehouseLocating, setWarehouseLocating] = useState(false);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [productForm, setProductForm] = useState(emptyProductForm);
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
@@ -58,6 +61,13 @@ export default function OrganisationDashboard() {
   const [menuImageFile, setMenuImageFile] = useState<File | null>(null);
   const [menuImagePreview, setMenuImagePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [closingBalance, setClosingBalance] = useState("");
+  const [financeForm, setFinanceForm] = useState({ entry_type: "expense", category: "", amount: "", payment_method: "cash", description: "" });
+  const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
+  const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm);
+  const [outletDialogOpen, setOutletDialogOpen] = useState(false);
+  const [outletForm, setOutletForm] = useState(emptyOutletForm);
 
   if (authLoading || loading) {
     return (
@@ -88,8 +98,43 @@ export default function OrganisationDashboard() {
 
   if (!data) return null;
 
-  const { organization, warehouses, products, employees, stock, performance, restaurant, menuItems, isPdg } = data;
+  const { organization, warehouses, products, employees, roles = [], outlets = [], stock, performance, restaurant, menuItems, restaurantOrders = [], cashSessions = [], financialEntries = [], isPdg, roleCode, capabilities } = data;
   const isRestaurant = (organization as any)?.organization_type === "restaurant";
+  const openCashSession = cashSessions.find((session) => session.status === "open");
+  const totalIncome = financialEntries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const totalExpenses = financialEntries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const employeeRoles = roles.filter((role) => !["ceo", "pdg", "president", "directeur_general", "directeur_generale", "general_management"].includes(role.code.toLowerCase()));
+
+  const createEmployee = async () => {
+    if (!employeeForm.full_name.trim() || !employeeForm.email.trim() || !employeeForm.organization_role_id || !employeeForm.restaurant_outlet_id || employeeForm.password.length < 8) {
+      toast({ title: "Informations incomplètes", description: "Renseignez le nom, l'e-mail, le poste et un mot de passe d'au moins 8 caractères.", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await callAction("create_organization_employee", { ...employeeForm, organization_role_id: Number(employeeForm.organization_role_id), restaurant_outlet_id: Number(employeeForm.restaurant_outlet_id) });
+      toast({ title: "Compte créé", description: "L'employé est maintenant rattaché à votre organisation." });
+      setEmployeeForm(emptyEmployeeForm);
+      setEmployeeDialogOpen(false);
+      await refetch();
+    } catch (employeeError: any) {
+      toast({ title: "Création impossible", description: employeeError?.message || "Une erreur est survenue", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const saveOutlet = async () => {
+    if (!outletForm.name.trim()) return;
+    setSubmitting(true);
+    try {
+      await callAction("upsert_restaurant_outlet", outletForm);
+      toast({ title: outletForm.id ? "Point de vente modifié" : "Point de vente créé" });
+      setOutletForm(emptyOutletForm); setOutletDialogOpen(false); await refetch();
+    } catch (outletError: any) {
+      toast({ title: "Enregistrement impossible", description: outletError?.message, variant: "destructive" });
+    } finally { setSubmitting(false); }
+  };
 
   if (isRestaurant && !restaurantInitialized) {
     setRestaurantInitialized(true);
@@ -127,14 +172,20 @@ export default function OrganisationDashboard() {
       toast({ title: "Erreur", description: "Le nom du magasin est obligatoire", variant: "destructive" });
       return;
     }
+    const latitude = Number(warehouseForm.latitude.replace(",", "."));
+    const longitude = Number(warehouseForm.longitude.replace(",", "."));
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      toast({ title: "Position GPS obligatoire", description: "Utilisez le bouton GPS pour enregistrer une position valide.", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       await callAction("upsert_warehouse", {
         id: warehouseForm.id,
         name: warehouseForm.name,
         address: warehouseForm.address || null,
-        latitude: warehouseForm.latitude ? Number(warehouseForm.latitude) : null,
-        longitude: warehouseForm.longitude ? Number(warehouseForm.longitude) : null,
+        latitude,
+        longitude,
       });
       toast({ title: "Magasin enregistré" });
       setWarehouseDialogOpen(false);
@@ -324,6 +375,90 @@ export default function OrganisationDashboard() {
     }
   };
 
+  const captureWarehouseLocation = () => {
+    if (!window.isSecureContext) {
+      toast({
+        title: "GPS bloqué par le navigateur",
+        description: "Ouvrez cette application avec son adresse HTTPS pour utiliser le GPS en un clic.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!navigator.geolocation) {
+      toast({ title: "GPS indisponible", description: "Cet appareil ne fournit pas la géolocalisation.", variant: "destructive" });
+      return;
+    }
+
+    setWarehouseLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setWarehouseForm((current) => ({
+          ...current,
+          latitude: coords.latitude.toFixed(6),
+          longitude: coords.longitude.toFixed(6),
+        }));
+        setWarehouseLocating(false);
+        toast({ title: "Position GPS enregistrée", description: `Précision : environ ${Math.round(coords.accuracy)} m` });
+      },
+      (locationError) => {
+        setWarehouseLocating(false);
+        const description = locationError.code === locationError.PERMISSION_DENIED
+          ? "Autorisez la localisation pour ce site, puis réessayez."
+          : "Impossible d'obtenir la position. Activez le GPS et réessayez.";
+        toast({ title: "Localisation impossible", description, variant: "destructive" });
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  };
+
+  const updateOrderStatus = async (orderId: string, status: string) => {
+    try {
+      await callAction("update_restaurant_order_status", { order_id: orderId, status });
+      toast({ title: "Commande mise à jour" });
+      await refetch();
+    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); }
+  };
+
+  const updatePaymentStatus = async (orderId: string, paymentStatus: string) => {
+    try {
+      await callAction("confirm_restaurant_order_payment", { order_id: orderId, payment_status: paymentStatus });
+      toast({ title: "Paiement mis à jour" });
+      await refetch(true);
+    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); }
+  };
+
+  const updateDeliveryStatus = async (orderId: string, deliveryStatus: string) => {
+    try {
+      await callAction("update_restaurant_delivery_status", { order_id: orderId, delivery_status: deliveryStatus });
+      toast({ title: "Livraison mise à jour" });
+      await refetch(true);
+    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); }
+  };
+
+  const openCash = async () => {
+    try {
+      await callAction("open_cash_session", { opening_balance: Number(openingBalance) || 0 });
+      setOpeningBalance(""); toast({ title: "Caisse ouverte" }); await refetch();
+    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); }
+  };
+
+  const closeCash = async () => {
+    if (!openCashSession) return;
+    try {
+      await callAction("close_cash_session", { session_id: openCashSession.id, closing_balance: Number(closingBalance) || 0 });
+      setClosingBalance(""); toast({ title: "Caisse clôturée" }); await refetch();
+    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); }
+  };
+
+  const recordFinancialEntry = async () => {
+    if (!financeForm.category.trim() || Number(financeForm.amount) <= 0) return;
+    try {
+      await callAction("record_financial_entry", { ...financeForm, amount: Number(financeForm.amount) });
+      setFinanceForm({ entry_type: "expense", category: "", amount: "", payment_method: "cash", description: "" });
+      toast({ title: "Écriture enregistrée" }); await refetch();
+    } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); }
+  };
+
   return (
     <div className="min-h-screen bg-muted/30 p-6 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -338,17 +473,13 @@ export default function OrganisationDashboard() {
         </Button>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
         {isRestaurant ? (
-          <Card>
-            <CardContent className="p-6 flex items-center gap-4">
-              <UtensilsCrossed className="h-8 w-8 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">Plats au menu</p>
-                <p className="text-2xl font-bold">{menuItems.length}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <>
+            <Card><CardContent className="p-6 flex items-center gap-4"><UtensilsCrossed className="h-8 w-8 text-primary" /><div><p className="text-sm text-muted-foreground">Plats au menu</p><p className="text-2xl font-bold">{menuItems.length}</p></div></CardContent></Card>
+            <Card><CardContent className="p-6 flex items-center gap-4"><ClipboardList className="h-8 w-8 text-primary" /><div><p className="text-sm text-muted-foreground">Commandes</p><p className="text-2xl font-bold">{restaurantOrders.length}</p></div></CardContent></Card>
+            <Card><CardContent className="p-6 flex items-center gap-4"><TrendingUp className="h-8 w-8 text-primary" /><div><p className="text-sm text-muted-foreground">Résultat enregistré</p><p className="text-2xl font-bold">{(totalIncome - totalExpenses).toLocaleString()} F</p></div></CardContent></Card>
+          </>
         ) : (
           <>
             <Card>
@@ -388,6 +519,9 @@ export default function OrganisationDashboard() {
             <>
               <TabsTrigger value="restaurant">Mon restaurant</TabsTrigger>
               <TabsTrigger value="menu">Menu</TabsTrigger>
+              <TabsTrigger value="commandes">Commandes</TabsTrigger>
+              {capabilities.manageCash && <TabsTrigger value="caisse">Caisse</TabsTrigger>}
+              {(capabilities.viewAll || capabilities.manageAccounting) && <TabsTrigger value="comptabilite">Comptabilité</TabsTrigger>}
             </>
           ) : (
             <>
@@ -395,10 +529,12 @@ export default function OrganisationDashboard() {
               <TabsTrigger value="produits">Produits &amp; Stock</TabsTrigger>
             </>
           )}
+          {isPdg && isRestaurant && <TabsTrigger value="points-vente">Points de vente</TabsTrigger>}
           {isPdg && <TabsTrigger value="employes">Employés &amp; Performance</TabsTrigger>}
         </TabsList>
 
         {isRestaurant && (
+          <>
           <TabsContent value="restaurant" className="space-y-4">
             <Card>
               <CardContent className="p-6 space-y-4">
@@ -475,6 +611,32 @@ export default function OrganisationDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="commandes" className="space-y-4">
+            <Card><CardHeader><CardTitle>Commandes du restaurant</CardTitle></CardHeader><CardContent className="p-0 overflow-x-auto">
+              <Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Client</TableHead><TableHead>Montant</TableHead><TableHead>Moyen</TableHead><TableHead>Paiement</TableHead><TableHead>Livraison</TableHead><TableHead>Préparation</TableHead></TableRow></TableHeader>
+                <TableBody>{restaurantOrders.map((order) => <TableRow key={order.id}>
+                  <TableCell>{new Date(order.created_at).toLocaleString("fr-FR")}</TableCell><TableCell>{order.customer_name || "—"}<div className="text-xs text-muted-foreground">{order.telephone}</div></TableCell>
+                  <TableCell className="font-medium">{Number(order.total || 0).toLocaleString()} FCFA</TableCell><TableCell>{order.payment_method || "—"}</TableCell><TableCell>{capabilities.managePayments ? <select className="h-9 rounded-md border bg-background px-2" value={order.payment_status || "pending"} onChange={(e) => void updatePaymentStatus(order.id, e.target.value)}><option value="pending">En attente</option><option value="confirmed">Confirmé</option><option value="rejected">Refusé</option></select> : <Badge variant={order.payment_status === "confirmed" ? "default" : "secondary"}>{order.payment_status || "pending"}</Badge>}</TableCell><TableCell>{capabilities.manageDelivery ? <select className="h-9 rounded-md border bg-background px-2" value={order.delivery_status || "pending"} onChange={(e) => void updateDeliveryStatus(order.id, e.target.value)}><option value="pending">À affecter</option><option value="assigned">Affectée</option><option value="picked_up">Récupérée</option><option value="on_the_way">En route</option><option value="delivered">Livrée</option><option value="cancelled">Annulée</option></select> : <Badge variant={order.delivery_status === "delivered" ? "default" : "secondary"}>{order.delivery_status || "pending"}</Badge>}</TableCell>
+                  <TableCell>{capabilities.manageOrders ? <select className="h-9 rounded-md border bg-background px-2" value={order.status || "pending"} onChange={(e) => void updateOrderStatus(order.id, e.target.value)}><option value="pending">En attente</option><option value="confirmed">Confirmée</option><option value="preparing">En préparation</option><option value="ready">Prête</option><option value="completed">Terminée</option><option value="cancelled">Annulée</option></select> : <Badge>{order.status || "pending"}</Badge>}</TableCell>
+                </TableRow>)}{restaurantOrders.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Aucune commande</TableCell></TableRow>}</TableBody>
+              </Table>
+            </CardContent></Card>
+          </TabsContent>
+
+          {capabilities.manageCash && <TabsContent value="caisse" className="space-y-4">
+            <Card><CardHeader><CardTitle><Wallet className="inline h-5 w-5 mr-2" />Caisse</CardTitle></CardHeader><CardContent className="space-y-4">
+              {openCashSession ? <><p>Caisse ouverte depuis {new Date(openCashSession.opened_at).toLocaleString("fr-FR")} — Fond initial : {Number(openCashSession.opening_balance).toLocaleString()} FCFA</p><div className="flex gap-3"><Input type="number" placeholder="Solde réellement compté" value={closingBalance} onChange={(e) => setClosingBalance(e.target.value)} /><Button onClick={() => void closeCash()}>Clôturer la caisse</Button></div></> : <><p className="text-muted-foreground">Aucune caisse ouverte.</p><div className="flex gap-3"><Input type="number" placeholder="Fond de caisse initial" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /><Button onClick={() => void openCash()}>Ouvrir la caisse</Button></div></>}
+            </CardContent></Card>
+            <Card><CardHeader><CardTitle>Historique des clôtures</CardTitle></CardHeader><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Ouverture</TableHead><TableHead>Statut</TableHead><TableHead>Attendu</TableHead><TableHead>Compté</TableHead><TableHead>Écart</TableHead></TableRow></TableHeader><TableBody>{cashSessions.map((session) => <TableRow key={session.id}><TableCell>{new Date(session.opened_at).toLocaleString("fr-FR")}</TableCell><TableCell><Badge variant={session.status === "open" ? "default" : "secondary"}>{session.status === "open" ? "Ouverte" : "Clôturée"}</Badge></TableCell><TableCell>{Number(session.expected_balance || 0).toLocaleString()} F</TableCell><TableCell>{Number(session.closing_balance || 0).toLocaleString()} F</TableCell><TableCell>{Number(session.variance || 0).toLocaleString()} F</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
+          </TabsContent>}
+
+          {(capabilities.viewAll || capabilities.manageAccounting) && <TabsContent value="comptabilite" className="space-y-4">
+            <div className="grid md:grid-cols-3 gap-4"><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Recettes</p><p className="text-2xl font-bold text-green-600">{totalIncome.toLocaleString()} F</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Dépenses</p><p className="text-2xl font-bold text-red-600">{totalExpenses.toLocaleString()} F</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Résultat</p><p className="text-2xl font-bold">{(totalIncome - totalExpenses).toLocaleString()} F</p></CardContent></Card></div>
+            {capabilities.manageAccounting && <Card><CardHeader><CardTitle>Nouvelle écriture</CardTitle></CardHeader><CardContent className="grid md:grid-cols-5 gap-3"><select className="h-10 rounded-md border bg-background px-3" value={financeForm.entry_type} onChange={(e) => setFinanceForm({ ...financeForm, entry_type: e.target.value })}><option value="expense">Dépense</option><option value="income">Recette</option></select><Input placeholder="Catégorie" value={financeForm.category} onChange={(e) => setFinanceForm({ ...financeForm, category: e.target.value })} /><Input type="number" placeholder="Montant" value={financeForm.amount} onChange={(e) => setFinanceForm({ ...financeForm, amount: e.target.value })} /><select className="h-10 rounded-md border bg-background px-3" value={financeForm.payment_method} onChange={(e) => setFinanceForm({ ...financeForm, payment_method: e.target.value })}><option value="cash">Espèces</option><option value="wave">Wave</option><option value="orange_money">Orange Money</option><option value="bank">Banque</option></select><Button onClick={() => void recordFinancialEntry()}>Enregistrer</Button></CardContent></Card>}
+            <Card><CardHeader><CardTitle>Journal financier</CardTitle></CardHeader><CardContent className="p-0"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Catégorie</TableHead><TableHead>Paiement</TableHead><TableHead>Montant</TableHead></TableRow></TableHeader><TableBody>{financialEntries.map((entry) => <TableRow key={entry.id}><TableCell>{new Date(entry.occurred_at).toLocaleString("fr-FR")}</TableCell><TableCell>{entry.entry_type === "income" ? "Recette" : "Dépense"}</TableCell><TableCell>{entry.category}</TableCell><TableCell>{entry.payment_method || "—"}</TableCell><TableCell className={entry.entry_type === "income" ? "text-green-600 font-medium" : "text-red-600 font-medium"}>{entry.entry_type === "income" ? "+" : "-"}{Number(entry.amount).toLocaleString()} F</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
+          </TabsContent>}
+          </>
         )}
 
         {isRestaurant && (
@@ -667,8 +829,22 @@ export default function OrganisationDashboard() {
         </>
         )}
 
+        {isPdg && isRestaurant && (
+          <TabsContent value="points-vente" className="space-y-4">
+            <div className="flex items-center justify-between gap-4"><div><h2 className="text-xl font-semibold">Points de vente</h2><p className="text-sm text-muted-foreground">Une équipe et un suivi séparés pour chaque quartier.</p></div><Button onClick={() => { setOutletForm(emptyOutletForm); setOutletDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" />Ajouter</Button></div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{outlets.map((outlet) => <Card key={outlet.id}><CardHeader><CardTitle className="flex items-center justify-between text-base"><span>{outlet.name}</span>{outlet.is_primary && <Badge>Principal</Badge>}</CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><p>{outlet.neighborhood || "Quartier non renseigné"}</p><p className="text-muted-foreground">{outlet.address || "Adresse non renseignée"}</p><p>{outlet.telephone || "Téléphone non renseigné"}</p><Button variant="outline" size="sm" onClick={() => { setOutletForm({ id: outlet.id, name: outlet.name, neighborhood: outlet.neighborhood || "", address: outlet.address || "", telephone: outlet.telephone || "", is_active: outlet.is_active }); setOutletDialogOpen(true); }}>Modifier</Button></CardContent></Card>)}</div>
+          </TabsContent>
+        )}
+
         {isPdg && (
           <TabsContent value="employes" className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Équipe administrative</h2>
+                <p className="text-sm text-muted-foreground">Créez ici les comptes du gérant, du caissier, du cuisinier et du comptable.</p>
+              </div>
+              <Button onClick={() => setEmployeeDialogOpen(true)}><Plus className="mr-2 h-4 w-4" />Créer un compte</Button>
+            </div>
             <Card>
               <CardContent className="p-0">
                 <Table>
@@ -676,6 +852,7 @@ export default function OrganisationDashboard() {
                     <TableRow>
                       <TableHead>Employé</TableHead>
                       <TableHead>Poste</TableHead>
+                      <TableHead>Point de vente</TableHead>
                       <TableHead>Ventes (CA)</TableHead>
                       <TableHead>Commandes traitées</TableHead>
                       <TableHead>Recrutements</TableHead>
@@ -697,6 +874,7 @@ export default function OrganisationDashboard() {
                             <div className="text-sm text-muted-foreground">{emp.email}</div>
                           </TableCell>
                           <TableCell>{role?.name || "—"}</TableCell>
+                          <TableCell>{outlets.find((outlet) => outlet.id === emp.restaurant_outlet_id)?.name || "Direction générale"}</TableCell>
                           <TableCell>{totalSales.toLocaleString()} FCFA</TableCell>
                           <TableCell>{totalOrders}</TableCell>
                           <TableCell>{totalRecruited}</TableCell>
@@ -718,6 +896,30 @@ export default function OrganisationDashboard() {
           </TabsContent>
         )}
       </Tabs>
+
+      <Dialog open={employeeDialogOpen} onOpenChange={setEmployeeDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Créer un compte employé</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Nom complet</Label><Input value={employeeForm.full_name} onChange={(e) => setEmployeeForm({ ...employeeForm, full_name: e.target.value })} /></div>
+            <div><Label>Adresse e-mail</Label><Input type="email" value={employeeForm.email} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} /></div>
+            <div>
+              <Label>Poste</Label>
+              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={employeeForm.organization_role_id} onChange={(e) => setEmployeeForm({ ...employeeForm, organization_role_id: e.target.value })}>
+                <option value="">Sélectionner un poste</option>
+                {employeeRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+              </select>
+            </div>
+            <div><Label>Point de vente</Label><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={employeeForm.restaurant_outlet_id} onChange={(e) => setEmployeeForm({ ...employeeForm, restaurant_outlet_id: e.target.value })}><option value="">Sélectionner un point de vente</option>{outlets.filter((outlet) => outlet.is_active).map((outlet) => <option key={outlet.id} value={outlet.id}>{outlet.name}{outlet.neighborhood ? ` — ${outlet.neighborhood}` : ""}</option>)}</select></div>
+            <div><Label>Mot de passe provisoire</Label><Input type="password" minLength={8} value={employeeForm.password} onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })} /><p className="mt-1 text-xs text-muted-foreground">Au moins 8 caractères. Communiquez-le directement à l'employé.</p></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setEmployeeDialogOpen(false)}>Annuler</Button><Button disabled={submitting} onClick={() => void createEmployee()}>{submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Créer le compte</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={outletDialogOpen} onOpenChange={setOutletDialogOpen}>
+        <DialogContent><DialogHeader><DialogTitle>{outletForm.id ? "Modifier le point de vente" : "Ajouter un point de vente"}</DialogTitle></DialogHeader><div className="space-y-4"><div><Label>Nom</Label><Input value={outletForm.name} onChange={(e) => setOutletForm({ ...outletForm, name: e.target.value })} placeholder="Ex. Chez Ramadan — Kaloum" /></div><div><Label>Quartier</Label><Input value={outletForm.neighborhood} onChange={(e) => setOutletForm({ ...outletForm, neighborhood: e.target.value })} /></div><div><Label>Adresse</Label><Input value={outletForm.address} onChange={(e) => setOutletForm({ ...outletForm, address: e.target.value })} /></div><div><Label>Téléphone</Label><Input value={outletForm.telephone} onChange={(e) => setOutletForm({ ...outletForm, telephone: e.target.value })} /></div></div><DialogFooter><Button variant="outline" onClick={() => setOutletDialogOpen(false)}>Annuler</Button><Button disabled={submitting || !outletForm.name.trim()} onClick={() => void saveOutlet()}>{submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer</Button></DialogFooter></DialogContent>
+      </Dialog>
 
       <Dialog open={warehouseDialogOpen} onOpenChange={setWarehouseDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -743,6 +945,13 @@ export default function OrganisationDashboard() {
                 <Input value={warehouseForm.longitude} onChange={(e) => setWarehouseForm({ ...warehouseForm, longitude: e.target.value })} />
               </div>
             </div>
+            <Button type="button" variant="outline" className="w-full gap-2" onClick={captureWarehouseLocation} disabled={warehouseLocating}>
+              {warehouseLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+              {warehouseLocating ? "Recherche de la position..." : "Utiliser ma position GPS"}
+            </Button>
+            {warehouseForm.latitude && warehouseForm.longitude && (
+              <p className="flex items-center gap-2 text-sm text-green-700"><MapPin className="h-4 w-4" /> Position prête à être enregistrée.</p>
+            )}
           </div>
           <DialogFooter>
             <Button onClick={() => void submitWarehouse()} disabled={submitting}>

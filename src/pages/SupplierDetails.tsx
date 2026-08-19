@@ -31,7 +31,7 @@ const SupplierDetails = () => {
 
   const sendQuote = async () => {
     if (!selectedProduct || !quote.name.trim() || !quote.phone.trim()) { toast.error("Indiquez votre nom et votre téléphone."); return; }
-    const { error } = await (supabase as any).from("quote_requests").insert({ product_id: selectedProduct.id, supplier_id: supplier.id, customer_name: quote.name.trim(), phone: quote.phone.trim(), quantity: Number(quote.quantity) || 1, message: quote.message.trim() });
+    const { error } = await (supabase as any).from("quote_requests").insert({ supplier_product_id: selectedProduct.id, supplier_id: supplier.id, customer_name: quote.name.trim(), telephone: quote.phone.trim(), quantity: Number(quote.quantity) || 1, message: quote.message.trim() });
     if (error) { toast.error("La demande de devis n'a pas pu être envoyée."); return; }
     toast.success("Demande de devis envoyée."); setSelectedProduct(null); setQuote({ name: "", phone: "", quantity: 1, message: "" });
   };

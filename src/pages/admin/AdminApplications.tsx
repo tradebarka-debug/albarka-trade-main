@@ -5,7 +5,7 @@ interface Application {
     id: number;
     name: string;
     email: string;
-    phone: string;
+    telephone: string;
     experience: string;
     message: string;
     tracking_code: string;
@@ -46,7 +46,7 @@ const AdminApplications = () => {
                         </h2>
 
                         <p><strong>Email :</strong> {app.email}</p>
-                        <p><strong>Téléphone :</strong> {app.phone}</p>
+                        <p><strong>Téléphone :</strong> {app.telephone}</p>
                         <p><strong>Expérience :</strong> {app.experience}</p>
                         <p><strong>Message :</strong> {app.message}</p>
                         <p><strong>Suivi :</strong> {app.tracking_code}</p>

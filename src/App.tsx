@@ -66,6 +66,7 @@ import VerificationOtpRepresentant from "./pages/VerificationOtpRepresentant";
 import NouveauPinRepresentant from "./pages/NouveauPinRepresentant";
 import BookingVerification from "@/pages/BookingVerification";
 import UserSpace from "@/pages/UserSpace";
+import GlobalBackButton from "@/components/GlobalBackButton";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -97,6 +98,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <ScrollToTop />
+            <GlobalBackButton />
             <Routes>
               {/* Admin routes - without Header/Footer */}
               <Route path="/admin" element={<AdminLayout />}>

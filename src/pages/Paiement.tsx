@@ -87,6 +87,7 @@ const Paiement = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [showManualLocation, setShowManualLocation] = useState(false);
   const [manualLatitude, setManualLatitude] = useState("");
   const [manualLongitude, setManualLongitude] = useState("");
@@ -112,6 +113,7 @@ const Paiement = () => {
   const distanceKm = coordinates && restaurantConfig?.latitude != null && restaurantConfig?.longitude != null
     ? haversineDistance(coordinates.latitude, coordinates.longitude, Number(restaurantConfig.latitude), Number(restaurantConfig.longitude))
     : 0;
+  const isDistanceSuspicious = requiresDelivery && distanceKm > 100;
   const deliveryFee = requiresDelivery && restaurantId
     ? Math.ceil(Number(restaurantConfig?.delivery_fee || 0) + distanceKm * Number(restaurantConfig?.delivery_fee_per_km || 0))
     : 0;
@@ -151,6 +153,7 @@ const Paiement = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setLocationAccuracy(position.coords.accuracy);
         setIsLocating(false);
         toast.success("Position ajoutée à votre livraison.");
       },
@@ -165,7 +168,7 @@ const Paiement = () => {
           toast.error("Position indisponible. Vous pouvez saisir les coordonnées manuellement.");
         }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   };
 
@@ -177,6 +180,8 @@ const Paiement = () => {
       return;
     }
     setCoordinates({ latitude, longitude });
+    setLocationAccuracy(null);
+    setShowManualLocation(false);
     toast.success("Position manuelle enregistrée.");
   };
 
@@ -263,6 +268,19 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
 
       if (selectedMethod !== "cash_on_delivery" && !screenshot) {
         toast.error("Veuillez ajouter la capture d'écran de votre paiement");
+        return;
+      }
+
+      if (requiresDelivery && !coordinates) {
+        toast.error("La position GPS est obligatoire pour une livraison. Ajoutez votre position avant de continuer.");
+        setShowManualLocation(true);
+        setStep(1);
+        return;
+      }
+
+      if (isDistanceSuspicious) {
+        toast.error("La position détectée est anormalement éloignée du restaurant. Vérifiez votre GPS ou saisissez votre position manuellement.");
+        setShowManualLocation(true);
         return;
       }
 
@@ -517,7 +535,7 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="font-medium">Position de livraison</p>
-                        <p className="text-sm text-muted-foreground">Facultatif, mais recommandé pour permettre au livreur de vous trouver.</p>
+                        <p className="text-sm text-muted-foreground">Obligatoire pour une livraison, afin que le livreur puisse vous trouver.</p>
                       </div>
                       <Button type="button" variant="outline" onClick={captureLocation} disabled={isLocating} className="gap-2">
                         <LocateFixed className="w-4 h-4" />
@@ -569,7 +587,9 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
                       </label>
                       {disposableKits && <div><Label htmlFor="kitQuantity">Nombre de personnes</Label><Input id="kitQuantity" className="mt-1 w-32" type="number" min="1" value={kitQuantity} onChange={(event) => setKitQuantity(Math.max(1, Number(event.target.value) || 1))} /></div>}
                       <div className="space-y-1 border-t pt-3 text-sm">
-                        {requiresDelivery && <div className="flex justify-between"><span>Distance estimée</span><strong>{distanceKm ? `${distanceKm.toFixed(1)} km` : "Ajoutez votre position GPS"}</strong></div>}
+                        {requiresDelivery && <div className="flex justify-between"><span>Distance estimée</span><strong className={isDistanceSuspicious ? "text-destructive" : ""}>{distanceKm ? `${distanceKm.toFixed(1)} km` : "Ajoutez votre position GPS"}</strong></div>}
+                        {requiresDelivery && locationAccuracy != null && <div className="flex justify-between text-xs text-muted-foreground"><span>Précision GPS</span><span>± {Math.round(locationAccuracy)} m</span></div>}
+                        {isDistanceSuspicious && <p className="text-sm text-destructive">Position incohérente : réactivez le GPS ou utilisez la saisie manuelle avant de valider.</p>}
                         <div className="flex justify-between"><span>Frais de livraison</span><strong>{formatPrice(deliveryFee)}</strong></div>
                         {disposableKits && <div className="flex justify-between"><span>Kits jetables</span><strong>{formatPrice(disposableKitFee)}</strong></div>}
                       </div>
@@ -582,7 +602,7 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
                     variant="default"
                     size="lg"
                     onClick={() => setStep(2)}
-                    disabled={!formData.name || !formData.phone || !formData.address}
+                    disabled={!formData.name || !formData.phone || !formData.address || (requiresDelivery && !coordinates)}
                   >
                     Continuer vers le paiement
                   </Button>

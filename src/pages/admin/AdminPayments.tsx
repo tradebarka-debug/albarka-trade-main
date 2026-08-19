@@ -50,6 +50,7 @@ interface PaymentRequest {
   payment_method: string | null;
   transaction_ref: string | null;
   status: string | null;
+  payment_status: "pending" | "confirmed" | "rejected" | null;
   promo_code: string | null;
   items: string | null;
   profiles: {
@@ -113,10 +114,14 @@ const AdminPayments = () => {
       console.log("Paiement sélectionné :", selectedPayment);
       console.log("ID :", selectedPayment.id);
 
+      const { data: authData } = await supabase.auth.getUser();
+      const paymentStatus = status === "approved" ? "confirmed" : "rejected";
       const { error } = await supabase
         .from('orders' as any)
         .update({
-          status,
+          payment_status: paymentStatus,
+          payment_confirmed_by: authData.user?.id || null,
+          payment_confirmed_at: new Date().toISOString(),
         })
         .eq('id', selectedPayment.id);
 
@@ -166,7 +171,7 @@ const AdminPayments = () => {
     switch (status) {
       case "pending":
         return <Badge variant="outline" className="bg-yellow-500/20 text-yellow-700 border-yellow-500/30"><Clock className="w-3 h-3 mr-1" /> En attente</Badge>;
-      case "approved":
+      case "confirmed":
         return <Badge variant="outline" className="bg-green-500/20 text-green-700 border-green-500/30"><CheckCircle className="w-3 h-3 mr-1" /> Approuvé</Badge>;
       case "rejected":
         return <Badge variant="outline" className="bg-red-500/20 text-red-700 border-red-500/30"><XCircle className="w-3 h-3 mr-1" /> Rejeté</Badge>;
@@ -174,6 +179,8 @@ const AdminPayments = () => {
         return <Badge>{status}</Badge>;
     }
   };
+
+  const paymentState = (payment: PaymentRequest) => payment.payment_status || "pending";
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("fr-FR").format(price) + " FCFA";
@@ -196,14 +203,14 @@ const AdminPayments = () => {
       payment.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (payment.telephone || "").includes(searchTerm);
 
-    const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || paymentState(payment) === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
-  const pendingCount = payments.filter(p => p.status === "pending").length;
-  const approvedCount = payments.filter(p => p.status === "approved").length;
-  const rejectedCount = payments.filter(p => p.status === "rejected").length;
+  const pendingCount = payments.filter(p => paymentState(p) === "pending").length;
+  const approvedCount = payments.filter(p => paymentState(p) === "confirmed").length;
+  const rejectedCount = payments.filter(p => paymentState(p) === "rejected").length;
 
   return (
     <div className="space-y-6">
@@ -246,14 +253,14 @@ const AdminPayments = () => {
           />
         </div>
         <div className="flex gap-2">
-          {["all", "pending", "approved", "rejected"].map((status) => (
+          {["all", "pending", "confirmed", "rejected"].map((status) => (
             <Button
               key={status}
               variant={statusFilter === status ? "default" : "outline"}
               size="sm"
               onClick={() => setStatusFilter(status)}
             >
-              {status === "all" ? "Tous" : status === "pending" ? "En attente" : status === "approved" ? "Approuvés" : "Rejetés"}
+              {status === "all" ? "Tous" : status === "pending" ? "En attente" : status === "confirmed" ? "Approuvés" : "Rejetés"}
             </Button>
           ))}
         </div>
@@ -310,7 +317,7 @@ const AdminPayments = () => {
                     {formatPrice(Number(payment.amount))}
                   </TableCell>
                   <TableCell>
-                    {getStatusBadge(payment.status)}
+                    {getStatusBadge(paymentState(payment))}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -403,16 +410,16 @@ const AdminPayments = () => {
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   placeholder="Ajouter une note..."
-                  disabled={selectedPayment.status !== "pending"}
+                  disabled={paymentState(selectedPayment) !== "pending"}
                 />
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground">Statut actuel</p>
-                {getStatusBadge(selectedPayment.status)}
+                {getStatusBadge(paymentState(selectedPayment))}
               </div>
 
-              {selectedPayment.status === "pending" && selectedPayment.order_items && selectedPayment.order_items.length > 0 && (
+              {paymentState(selectedPayment) === "pending" && selectedPayment.order_items && selectedPayment.order_items.length > 0 && (
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
                   <p className="text-sm text-amber-700 flex items-center gap-2">
                     <CheckCircle className="w-4 h-4" />
@@ -421,7 +428,7 @@ const AdminPayments = () => {
                 </div>
               )}
 
-              {selectedPayment.status === "pending" && (
+              {paymentState(selectedPayment) === "pending" && (
                 <div className="flex gap-3 pt-4 border-t">
                   <Button
                     variant="outline"

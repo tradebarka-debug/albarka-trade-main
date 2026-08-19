@@ -22,6 +22,7 @@ const allowedOrigins = [
   "https://albarka-trade.lovable.app",
   "https://albarka-trade.com",
   "https://www.albarka-trade.com",
+  "https://neighbor-paso-radar-analytical.trycloudflare.com",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
@@ -29,7 +30,7 @@ const allowedOrigins = [
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+  const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|10\.153\.198\.191|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
   const allowedOrigin = allowedOrigins.includes(origin) || isLocalOrigin
     ? origin
     : allowedOrigins[0];

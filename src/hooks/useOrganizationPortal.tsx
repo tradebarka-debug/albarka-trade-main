@@ -50,6 +50,7 @@ export interface OrganizationEmployee {
   email: string | null;
   is_active: boolean;
   organization_role_id: number | null;
+  restaurant_outlet_id: number | null;
   organization_roles?: { name: string; code: string } | { name: string; code: string }[] | null;
 }
 
@@ -86,16 +87,59 @@ export interface MenuItem {
   is_available: boolean | null;
 }
 
+export interface OrganizationRole {
+  id: number;
+  name: string;
+  code: string;
+}
+
+export interface RestaurantOutlet {
+  id: number; organization_id: number; restaurant_id: string; name: string;
+  neighborhood: string | null; address: string | null; telephone: string | null;
+  is_primary: boolean; is_active: boolean;
+}
+
+export interface RestaurantOrder {
+  id: string; created_at: string; customer_name: string | null; telephone: string | null;
+  total: number | null; payment_method: string | null; payment_status: string; payment_confirmed_at: string | null; transaction_ref: string | null;
+  status: string | null; items: string | null; delivery_status: string; tracking_number: string | null;
+  requires_delivery: boolean;
+}
+
+export interface CashSession {
+  id: number; opened_at: string; closed_at: string | null; opening_balance: number;
+  expected_balance: number | null; closing_balance: number | null; variance: number | null;
+  status: "open" | "closed"; notes: string | null;
+}
+
+export interface FinancialEntry {
+  id: number; entry_type: "income" | "expense"; category: string; amount: number;
+  payment_method: string | null; description: string | null; occurred_at: string;
+}
+
+export interface OrganizationCapabilities {
+  viewAll: boolean; manageOrders: boolean; managePayments: boolean; manageDelivery: boolean; manageCash: boolean; manageAccounting: boolean;
+  manageTeam: boolean; manageCatalog: boolean;
+}
+
 export interface OrganizationDashboardData {
   organization: Record<string, unknown> | null;
   warehouses: Warehouse[];
   products: OrganizationProduct[];
   employees: OrganizationEmployee[];
+  roles: OrganizationRole[];
+  outlets: RestaurantOutlet[];
   stock: WarehouseStockRow[];
   performance: EmployeePerformanceRow[];
   restaurant: RestaurantProfile | null;
   menuItems: MenuItem[];
+  restaurantOrders: RestaurantOrder[];
+  cashSessions: CashSession[];
+  financialEntries: FinancialEntry[];
+  activityEvents: Array<{ id: number; event_type: string; details: Record<string, unknown>; created_at: string }>;
   isPdg: boolean;
+  roleCode: string;
+  capabilities: OrganizationCapabilities;
 }
 
 // Dashboard de l'organisation partenaire (PDG + employés), toutes les
@@ -105,8 +149,8 @@ export function useOrganizationPortal() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refetch = useCallback(async () => {
-    setLoading(true);
+  const refetch = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data: result, error: fnError } = await supabase.functions.invoke("organization-portal", {
       body: { action: "get_dashboard" },
     });
@@ -119,11 +163,25 @@ export function useOrganizationPortal() {
       setData(result as OrganizationDashboardData);
     }
 
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   useEffect(() => {
     void refetch();
+  }, [refetch]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refetch(true);
+    }, 10_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refetch(true);
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [refetch]);
 
   const callAction = useCallback(async (action: string, params: Record<string, unknown> = {}) => {

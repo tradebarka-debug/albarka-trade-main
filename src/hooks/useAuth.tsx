@@ -260,7 +260,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // appartient a l'organisation Albarka Trade elle-meme : un PDG/employe
         // d'une organisation partenaire (fournisseur/restaurant/usine) est
         // exclu meme s'il a un organizationRoleCode ou des permissions.
-        canAccessAdmin: isAdmin || isTransportPDG || (isInternalOrganization && Boolean(organizationRoleCode)) || permissionCodes.includes('access_admin'),
+        canAccessAdmin:
+          isAdmin ||
+          isTransportPDG ||
+          (isInternalOrganization &&
+            (Boolean(organizationRoleCode) || permissionCodes.includes('access_admin'))),
         hasPermission,
         isLoading,
         signIn,

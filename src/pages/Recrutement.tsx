@@ -365,7 +365,7 @@ const Recrutement = () => {
         {
           name: formData.name,
           email: formData.email,
-          phone: formData.phone,
+          telephone: formData.phone,
           city: formData.city,
           age: formData.age,
           gender: formData.gender,
