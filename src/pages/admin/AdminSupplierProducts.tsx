@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type Supplier = { id: number; company_name: string };
+type Supplier = { id: number; company_name: string; country_id: number | null };
 type SupplierProduct = { id: number; supplier_id: string; product_name: string; category: string | null; price: string | null; minimum_order: string | null; description: string | null; image_url: string | null; status: "active" | "hidden"; in_stock: boolean; stock_quantity: number };
 const emptyForm = { product_name: "", category: "", price: "", minimum_order: "", description: "", in_stock: true, stock_quantity: "0", status: "active" as "active" | "hidden" };
 const supplierProductsTable = supabase.from("supplier_products") as any;
@@ -29,7 +29,7 @@ export default function AdminSupplierProducts() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadSuppliers = async () => {
-    const { data, error } = await (supabase.from("suppliers") as any).select("id, company_name").order("company_name");
+    const { data, error } = await (supabase.from("suppliers") as any).select("id, company_name, country_id").order("company_name");
     if (error) toast.error("Impossible de charger les fournisseurs"); else setSuppliers(data ?? []);
   };
   const loadProducts = async () => {
@@ -50,7 +50,7 @@ export default function AdminSupplierProducts() {
   const saveProduct = async () => {
     if (!supplierId || !form.product_name.trim()) { toast.error("Le fournisseur et le nom du produit sont obligatoires"); return; }
     setSaving(true);
-    try { const image_url = imageFile ? await uploadImage(imageFile) : imagePreview; const payload = { supplier_id: supplierId, product_name: form.product_name.trim(), category: form.category.trim() || null, price: form.price.trim() || null, minimum_order: form.minimum_order.trim() || null, description: form.description.trim() || null, image_url, in_stock: form.in_stock, stock_quantity: Number(form.stock_quantity) || 0, status: form.status }; const { error } = editingProduct ? await supplierProductsTable.update(payload).eq("id", editingProduct.id) : await supplierProductsTable.insert(payload); if (error) throw error; toast.success(editingProduct ? "Produit modifié" : "Produit ajouté"); setDialogOpen(false); resetDialog(); void loadProducts(); } catch (error) { console.error(error); const message = typeof error === "object" && error !== null && "message" in error ? String(error.message) : "Erreur lors de la sauvegarde du produit"; toast.error(message); } finally { setSaving(false); }
+    try { const image_url = imageFile ? await uploadImage(imageFile) : imagePreview; const selectedSupplier = suppliers.find((supplier) => String(supplier.id) === String(supplierId)); const payload = { supplier_id: supplierId, country_id: selectedSupplier?.country_id ?? (Number(localStorage.getItem("country_id")) || 1), product_name: form.product_name.trim(), category: form.category.trim() || null, price: form.price.trim() || null, minimum_order: form.minimum_order.trim() || null, description: form.description.trim() || null, image_url, in_stock: form.in_stock, stock_quantity: Number(form.stock_quantity) || 0, status: form.status }; const { error } = editingProduct ? await supplierProductsTable.update(payload).eq("id", editingProduct.id) : await supplierProductsTable.insert(payload); if (error) throw error; toast.success(editingProduct ? "Produit modifié" : "Produit ajouté"); setDialogOpen(false); resetDialog(); void loadProducts(); } catch (error) { console.error(error); const message = typeof error === "object" && error !== null && "message" in error ? String(error.message) : "Erreur lors de la sauvegarde du produit"; toast.error(message); } finally { setSaving(false); }
   };
   const deleteProduct = async (id: number) => { if (!window.confirm("Supprimer ce produit ?")) return; const { error } = await supplierProductsTable.delete().eq("id", id); if (error) { toast.error("Suppression impossible"); return; } toast.success("Produit supprimé"); void loadProducts(); };
   const supplierName = (id: string) => suppliers.find((supplier) => String(supplier.id) === String(id))?.company_name ?? "Fournisseur inconnu";

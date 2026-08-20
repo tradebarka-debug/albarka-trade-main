@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, MapPin, Store } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -16,6 +16,8 @@ type RestaurantSummary = {
 };
 
 const RestaurantPartners = () => {
+  const [searchParams] = useSearchParams();
+  const promoCode = searchParams.get("promo")?.trim().toUpperCase() || "";
   const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const countryId = Number(localStorage.getItem("country_id")) || 1;
@@ -57,7 +59,7 @@ const RestaurantPartners = () => {
         ) : (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {restaurants.map((restaurant) => (
-              <Link key={restaurant.id} to={`/restaurant/${restaurant.slug}`} className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:-translate-y-1 hover:border-primary hover:shadow-lg">
+              <Link key={restaurant.id} to={`/restaurant/${restaurant.slug}${promoCode ? `?promo=${encodeURIComponent(promoCode)}` : ""}`} className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:-translate-y-1 hover:border-primary hover:shadow-lg">
                 <div className="h-52 bg-muted">
                   {restaurant.image_url ? <img src={restaurant.image_url} alt={restaurant.name || "Restaurant"} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Store className="h-12 w-12 text-muted-foreground" /></div>}
                 </div>

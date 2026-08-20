@@ -1,10 +1,11 @@
 import RepresentantLayout from "@/components/representant/RepresentantLayout";
 import { Button } from "@/components/ui/button";
 import { useRepresentant } from "@/hooks/useRepresentant";
+import { toast } from "sonner";
 
 export default function LienParrainageRepresentant() {
   const { representant } = useRepresentant();
-  const lien = `https://albarka-trade.com/rejoindre?ref=${representant?.code ?? ""}`;
+  const lien = `${window.location.origin}/offres?promo=${encodeURIComponent(representant?.code ?? "")}`;
 
   return (
     <RepresentantLayout title="Mon Lien de Parrainage">
@@ -16,7 +17,7 @@ export default function LienParrainageRepresentant() {
         </h1>
 
         <p className="text-gray-600 mb-6">
-          Partagez ce lien pour recruter de nouveaux représentants et gagner des commissions.
+          Partagez ce lien : le client choisira la boutique ou un restaurant partenaire et votre code sera conservé.
         </p>
 
         <div className="border rounded-xl p-5 bg-gray-50 break-all">
@@ -48,7 +49,7 @@ export default function LienParrainageRepresentant() {
 
         </div>
 
-        <Button className="mt-8">
+        <Button className="mt-8" onClick={() => { void navigator.clipboard.writeText(lien); toast.success("Lien copié"); }}>
           Copier mon lien
         </Button>
 

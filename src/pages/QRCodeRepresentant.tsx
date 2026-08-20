@@ -9,7 +9,7 @@ export default function QRCodeRepresentant() {
     const codeRepresentant = representant?.code || "";
 
 const lienParrainage =
-`https://albarka-trade.com/inscription-representant?parrain=${codeRepresentant}`;
+`${window.location.origin}/offres?promo=${encodeURIComponent(codeRepresentant)}`;
     return (
         <RepresentantLayout title="Mon QR Code">
 
@@ -20,7 +20,7 @@ const lienParrainage =
                 </h1>
 
                 <p className="text-gray-600 mb-8">
-                    Faites scanner ce QR Code pour permettre aux clients ou futurs représentants d'accéder directement à votre lien de parrainage.
+                    Faites scanner ce QR Code : le client pourra choisir la boutique ou un restaurant partenaire.
                 </p>
 
                 <div className="w-64 h-64 mx-auto border-2 border-dashed rounded-xl flex items-center justify-center bg-gray-50">

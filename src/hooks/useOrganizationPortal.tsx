@@ -74,6 +74,8 @@ export interface RestaurantProfile {
   hours: string | null;
   telephone: string | null;
   image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
   is_active: boolean | null;
 }
 

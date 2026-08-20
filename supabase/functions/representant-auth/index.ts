@@ -97,6 +97,19 @@ Deno.serve(async (req) => {
 
     const { action, ...params } = await req.json();
 
+    if (action === "validate_promo") {
+      const promoCode = String((params as any).code || "").trim().toUpperCase();
+      if (!promoCode || promoCode.length > 80) return jsonResponse({ valid: false }, 200, corsHeaders);
+      const [{ data: representant }, { data: application }, { data: commercial }, { data: partner }] = await Promise.all([
+        supabaseAdmin.from("representants").select("nom, prenom").eq("code", promoCode).maybeSingle(),
+        supabaseAdmin.from("partner_applications").select("full_name").eq("partner_code", promoCode).eq("status", "approved").maybeSingle(),
+        supabaseAdmin.from("commercials").select("first_name, last_name").eq("referral_code", promoCode).eq("status", "active").maybeSingle(),
+        supabaseAdmin.from("partners").select("name").or(`code.eq.${promoCode},referral_code.eq.${promoCode}`).eq("status", "active").maybeSingle(),
+      ]);
+      const displayName = representant ? [representant.prenom, representant.nom].filter(Boolean).join(" ") : application?.full_name || (commercial ? [commercial.first_name, commercial.last_name].filter(Boolean).join(" ") : "") || partner?.name;
+      return jsonResponse({ valid: Boolean(displayName), displayName: displayName || null }, 200, corsHeaders);
+    }
+
     if (action === "signup") {
       const { nom, prenom, telephone, email, pays, ville, type_piece, numero_piece, pin, parrain } = params as any;
 

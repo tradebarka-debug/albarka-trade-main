@@ -10,6 +10,7 @@ const RestaurantPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const sharedPromoCode = searchParams.get("promo")?.trim().toUpperCase() || "";
   const { addItem, totalItems, totalPrice } = useCart();
   const [restaurant, setRestaurant] = useState<any>(null);
   const [menuItems, setMenuItems] = useState<any[]>([]);
@@ -18,6 +19,7 @@ const RestaurantPage = () => {
   const countryName = selectedCountry === 2 ? "Côte d’Ivoire" : "Burkina Faso";
 
   useEffect(() => {
+    if (sharedPromoCode) localStorage.setItem("promoCode", sharedPromoCode);
     if (countryFromLink) localStorage.setItem("country_id", String(countryFromLink));
     const loadRestaurant = async () => {
       setRestaurant(null);
@@ -32,7 +34,7 @@ const RestaurantPage = () => {
       setMenuItems(menuData ?? []);
     };
     void loadRestaurant();
-  }, [countryFromLink, selectedCountry, slug]);
+  }, [countryFromLink, selectedCountry, sharedPromoCode, slug]);
 
   const addDishToCart = (dish: any) => {
     addItem({ id: `restaurant-${restaurant.id}-${dish.id}`, name: dish.name, price: Number(dish.price) || 0, image: dish.image_url || "/placeholder.svg", unit: "Plat", restaurantId: restaurant.id });
@@ -46,8 +48,8 @@ const RestaurantPage = () => {
   return <main className="min-h-screen bg-background pb-12">
     <div className="border-b bg-card p-4"><div className="container mx-auto flex items-center justify-between gap-3"><Button variant="outline" className="gap-2" onClick={() => navigate("/panier")}><ShoppingCart className="h-4 w-4" />Panier ({totalItems})</Button><select value={selectedCountry} onChange={(event) => { const country = Number(event.target.value); setSelectedCountry(country); localStorage.setItem("country_id", String(country)); }} className="rounded-md border bg-background px-3 py-2 text-sm"><option value={1}>Burkina Faso</option><option value={2}>Côte d’Ivoire</option></select></div></div>
     <div className="container mx-auto px-4 py-8">
-      <div className="overflow-hidden rounded-3xl border bg-card shadow-sm"><div className="relative h-64 md:h-96">{restaurant.image_url ? <img src={restaurant.image_url} alt={restaurant.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center bg-muted text-muted-foreground">Photo du restaurant</div>}<span className="absolute left-5 top-5 rounded-full bg-primary px-3 py-1 text-sm font-bold text-primary-foreground">Partenaire Albarka</span></div>
-        <div className="p-6 md:p-8"><div className="flex flex-col justify-between gap-5 md:flex-row"><div><h1 className="text-3xl font-bold text-foreground md:text-5xl">{restaurant.name}</h1><p className="mt-3 max-w-2xl text-muted-foreground">{restaurant.description}</p></div><span className={`h-fit rounded-full px-4 py-2 text-sm font-bold ${restaurant.is_available === false ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-700"}`}>{restaurant.is_available === false ? "Indisponible" : "Disponible"}</span></div>
+      <div className="overflow-hidden rounded-3xl border bg-card shadow-sm"><div className="relative h-64 md:h-96">{restaurant.image_url ? <img src={restaurant.image_url} alt={restaurant.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center bg-muted text-muted-foreground">Photo du restaurant</div>}</div>
+        <div className="p-6 md:p-8"><div className="flex flex-col justify-between gap-5 md:flex-row"><div><span className="mb-3 inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">Partenaire Albarka</span><h1 className="text-3xl font-bold text-foreground md:text-5xl">{restaurant.name}</h1><p className="mt-3 max-w-2xl text-muted-foreground">{restaurant.description}</p></div><span className={`h-fit rounded-full px-4 py-2 text-sm font-bold ${restaurant.is_available === false ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-700"}`}>{restaurant.is_available === false ? "Indisponible" : "Disponible"}</span></div>
           <div className="mt-6 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><Info icon={<MapPin />} label="Localisation" value={`${restaurant.location || "Zone non précisée"} · ${restaurant.country || countryName}`} /><Info icon={<Clock />} label="Horaires" value={restaurant.hours || "Non précisés"} /><Info icon={<Truck />} label="Livraison" value={deliveryFee ? `${new Intl.NumberFormat("fr-FR").format(deliveryFee)} FCFA` : "Gratuite"} /><Info icon={<Clock />} label="Temps estimé" value={restaurant.estimated_delivery_time || "À confirmer"} /></div>
           <div className="mt-6 flex flex-wrap gap-3"><Button onClick={() => document.getElementById("menu-restaurant")?.scrollIntoView({ behavior: "smooth" })} className="gap-2"><ShoppingCart className="h-4 w-4" />Commander en ligne</Button>{totalItems > 0 && <Button variant="outline" onClick={() => navigate("/panier")} className="gap-2">Voir le panier · {new Intl.NumberFormat("fr-FR").format(totalPrice)} FCFA</Button>}{whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Bonjour, je souhaite contacter ${restaurant.name}.`)}`} target="_blank" rel="noopener noreferrer"><Button variant="outline" className="gap-2 border-green-600 text-green-700"><MessageCircle className="h-4 w-4" />Contacter sur WhatsApp</Button></a>}</div>
         </div>

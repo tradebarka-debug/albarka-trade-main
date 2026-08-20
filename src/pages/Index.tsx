@@ -7,15 +7,18 @@ import ServicesSection from "@/components/home/ServicesSection";
 import Suppliers from "./Suppliers";
 import CTASection from "@/components/home/CTASection";
 import { isBurkina } from "@/data/country";
+import HomeTicker from "@/components/home/HomeTicker";
+import RevealOnScroll from "@/components/home/RevealOnScroll";
 
 const Index = () => (
   <main>
     <HomeActionHub />
+    <HomeTicker />
     <HeroSection />
-    <ProductsSection />
-    <FastFoodSection />
-    <div className="px-4 py-8 md:px-12">
-      <div className="mx-auto max-w-6xl rounded-3xl border-2 border-yellow-500 bg-gradient-to-r from-yellow-900/80 via-yellow-700/90 to-yellow-900/80 px-6 py-5 shadow-2xl md:px-10">
+    <RevealOnScroll><ProductsSection /></RevealOnScroll>
+    <RevealOnScroll><FastFoodSection /></RevealOnScroll>
+    <RevealOnScroll className="px-4 py-8 md:px-12">
+      <div className="mx-auto max-w-6xl rounded-3xl border-2 border-yellow-500 bg-gradient-to-r from-yellow-900/80 via-yellow-700/90 to-yellow-900/80 px-6 py-5 shadow-2xl transition duration-500 hover:-translate-y-1 hover:shadow-yellow-500/20 md:px-10">
         <p className="text-center text-base font-semibold leading-relaxed text-white md:text-xl">
           <span className="text-yellow-300">Albarka Trade International</span>
           {isBurkina
@@ -23,11 +26,11 @@ const Index = () => (
             : ", la plateforme digitale de référence en Côte d'Ivoire pour le commerce, les services et le recrutement."}
         </p>
       </div>
-    </div>
-    <Suppliers />
-    <ServicesSection />
-    <AboutSection />
-    <CTASection />
+    </RevealOnScroll>
+    <RevealOnScroll><Suppliers /></RevealOnScroll>
+    <RevealOnScroll><ServicesSection /></RevealOnScroll>
+    <RevealOnScroll><AboutSection /></RevealOnScroll>
+    <RevealOnScroll><CTASection /></RevealOnScroll>
   </main>
 );
 

@@ -576,9 +576,14 @@ Deno.serve(async (req) => {
     }
 
     if (action === "upsert_restaurant_profile") {
-      const { name, description, location, hours, telephone, image_url } = params as any;
+      const { name, description, location, hours, telephone, image_url, latitude, longitude } = params as any;
       if (!name) {
         return jsonResponse({ error: "Le nom du restaurant est obligatoire" }, 400, corsHeaders);
+      }
+      const parsedLatitude = Number(latitude);
+      const parsedLongitude = Number(longitude);
+      if (!Number.isFinite(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90 || !Number.isFinite(parsedLongitude) || parsedLongitude < -180 || parsedLongitude > 180) {
+        return jsonResponse({ error: "Coordonnées GPS invalides" }, 400, corsHeaders);
       }
 
       const { data: existing, error: existingError } = await supabaseAdmin
@@ -596,6 +601,8 @@ Deno.serve(async (req) => {
         hours: hours ?? null,
         telephone: telephone ?? null,
         image_url: image_url ?? null,
+        latitude: parsedLatitude,
+        longitude: parsedLongitude,
         category: "Restaurant",
         is_active: true,
       };

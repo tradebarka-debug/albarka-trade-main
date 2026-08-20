@@ -68,6 +68,7 @@ import NouveauPinRepresentant from "./pages/NouveauPinRepresentant";
 import BookingVerification from "@/pages/BookingVerification";
 import UserSpace from "@/pages/UserSpace";
 import GlobalBackButton from "@/components/GlobalBackButton";
+import ReferralLanding from "@/pages/ReferralLanding";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -211,6 +212,7 @@ const App = () => (
                       <Routes>
                         <Route path="/" element={<Index />} />
                         <Route path="/boutique" element={<Boutique />} />
+                        <Route path="/offres" element={<ReferralLanding />} />
                         <Route path="/panier" element={<Panier />} />
                         <Route path="/paiement" element={<Paiement />} />
                         <Route path="/suivi-livraison" element={<DeliveryTracking />} />

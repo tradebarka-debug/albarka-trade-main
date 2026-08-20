@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Filter, Loader2 } from "lucide-react";
 import { useProducts, Product } from "@/hooks/useProducts";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import StockIndicator from "@/components/boutique/StockIndicator";
 import { findPromoPartner, calculateCommission } from "@/utils/promoCode";
 import { supabase } from "@/integrations/supabase/client";
+import { useSearchParams } from "react-router-dom";
 
 const Boutique = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -14,6 +15,7 @@ const Boutique = () => {
   const { products, isLoading } = useProducts();
   const [promoCode, setPromoCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
+  const [searchParams] = useSearchParams();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [supplierNames, setSupplierNames] = useState<Record<number, string>>({});
   const countryName = Number(localStorage.getItem("country_id") || "1") === 2 ? "Côte d’Ivoire" : "Burkina Faso";
@@ -34,20 +36,33 @@ const Boutique = () => {
   const filteredProducts = selectedCategory
     ? products.filter((p) => p.category || p.categorie === selectedCategory)
     : products;
-  const validatePromoCode = () => {
-    if(!promoCode) { setPromoMessage("");
+  const validatePromoCode = useCallback(async (codeToValidate = promoCode) => {
+    if(!codeToValidate) { setPromoMessage("");
       return null;
       }
-      const partner = findPromoPartner(promoCode); 
+      const cleanCode = codeToValidate.trim().toUpperCase();
+      const partner = findPromoPartner(cleanCode);
       if (partner) {
   setPromoMessage(`code valide: ${partner.partnerName} — commission selon niveau`);
-  localStorage.setItem("promoCode", promoCode);
+  localStorage.setItem("promoCode", cleanCode);
   return partner;
 }
+      const { data, error } = await supabase.functions.invoke("representant-auth", { body: { action: "validate_promo", code: cleanCode } });
+      if (!error && data?.valid) {
+        setPromoMessage(`Code valide · Parrain : ${data.displayName}`);
+        localStorage.setItem("promoCode", cleanCode);
+        return data;
+      }
       setPromoMessage("code promo invalide");
       localStorage.removeItem("promoCode");
       return null;
-      };
+      }, [promoCode]);
+  useEffect(() => {
+    const sharedCode = searchParams.get("promo")?.trim().toUpperCase();
+    if (!sharedCode) return;
+    setPromoCode(sharedCode);
+    void validatePromoCode(sharedCode);
+  }, [searchParams, validatePromoCode]);
   const handleAddToCart = (product: Product) => {
     const quantity = Math.max(1, quantities[product.id] || 1);
     addItem({
@@ -93,7 +108,7 @@ type="text"
 placeholder="Code promo partenaire"
 value={promoCode}
 onChange={(e) => setPromoCode(e.target.value)}
-onBlur={validatePromoCode}
+onBlur={() => void validatePromoCode()}
 className="w-full p-3 rounded-lg border border-yellow-500 bg-black text-white"
 />
 {promoMessage && (

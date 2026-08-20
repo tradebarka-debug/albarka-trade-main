@@ -16,7 +16,7 @@ import { Loader2, Plus, Store, Package, Users, LogOut, ImageIcon, X, UtensilsCro
 
 const emptyWarehouseForm = { id: null as number | null, name: "", address: "", latitude: "", longitude: "" };
 const emptyProductForm = { id: null as number | null, name: "", description: "", category: "", price: "", unit: "", image: "" };
-const emptyRestaurantForm = { name: "", description: "", location: "", hours: "", telephone: "", image_url: "" };
+const emptyRestaurantForm = { name: "", description: "", location: "", hours: "", telephone: "", image_url: "", latitude: "", longitude: "" };
 const emptyMenuItemForm = { id: null as string | null, name: "", description: "", price: "", image_url: "", is_available: true };
 const emptyEmployeeForm = { full_name: "", email: "", telephone: "", password: "", organization_role_id: "", restaurant_outlet_id: "" };
 const emptyOutletForm = { id: null as number | null, name: "", neighborhood: "", address: "", telephone: "", is_active: true };
@@ -56,6 +56,7 @@ export default function OrganisationDashboard() {
   const [restaurantImageFile, setRestaurantImageFile] = useState<File | null>(null);
   const [restaurantImagePreview, setRestaurantImagePreview] = useState<string | null>(null);
   const [restaurantInitialized, setRestaurantInitialized] = useState(false);
+  const [restaurantLocating, setRestaurantLocating] = useState(false);
   const [menuItemDialogOpen, setMenuItemDialogOpen] = useState(false);
   const [menuItemForm, setMenuItemForm] = useState(emptyMenuItemForm);
   const [menuImageFile, setMenuImageFile] = useState<File | null>(null);
@@ -146,6 +147,8 @@ export default function OrganisationDashboard() {
       hours: restaurant?.hours ?? "",
       telephone: restaurant?.telephone ?? "",
       image_url: restaurant?.image_url ?? "",
+      latitude: restaurant?.latitude?.toString() ?? "",
+      longitude: restaurant?.longitude?.toString() ?? "",
     });
     setRestaurantImagePreview(restaurant?.image_url ?? null);
   }
@@ -292,12 +295,18 @@ export default function OrganisationDashboard() {
       toast({ title: "Erreur", description: "Le nom du restaurant est obligatoire", variant: "destructive" });
       return;
     }
+    const latitude = Number(restaurantForm.latitude.replace(",", "."));
+    const longitude = Number(restaurantForm.longitude.replace(",", "."));
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      toast({ title: "Position GPS invalide", description: "Utilisez le bouton GPS ou renseignez une latitude et une longitude valides.", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       const image_url = restaurantImageFile
         ? await uploadMenuOrRestaurantImage(restaurantImageFile, "restaurants")
         : restaurantForm.image_url;
-      await callAction("upsert_restaurant_profile", { ...restaurantForm, image_url: image_url || null });
+      await callAction("upsert_restaurant_profile", { ...restaurantForm, latitude, longitude, image_url: image_url || null });
       toast({ title: "Fiche restaurant enregistrée" });
       setRestaurantImageFile(null);
       await refetch();
@@ -374,6 +383,30 @@ export default function OrganisationDashboard() {
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
     }
+  };
+
+  const captureRestaurantLocation = () => {
+    if (!window.isSecureContext) {
+      toast({ title: "GPS bloqué", description: "Utilisez une adresse HTTPS ou saisissez les coordonnées manuellement.", variant: "destructive" });
+      return;
+    }
+    if (!navigator.geolocation) {
+      toast({ title: "GPS indisponible", description: "Cet appareil ne fournit pas la géolocalisation.", variant: "destructive" });
+      return;
+    }
+    setRestaurantLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setRestaurantForm((current) => ({ ...current, latitude: coords.latitude.toFixed(6), longitude: coords.longitude.toFixed(6) }));
+        setRestaurantLocating(false);
+        toast({ title: "Position du restaurant ajoutée", description: `Précision : environ ${Math.round(coords.accuracy)} m` });
+      },
+      (locationError) => {
+        setRestaurantLocating(false);
+        toast({ title: "Localisation impossible", description: locationError.code === locationError.PERMISSION_DENIED ? "Autorisez la localisation pour ce site, puis réessayez." : "Activez le GPS ou saisissez les coordonnées manuellement.", variant: "destructive" });
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
   };
 
   const captureWarehouseLocation = () => {
@@ -555,6 +588,15 @@ export default function OrganisationDashboard() {
                     onChange={(e) => setRestaurantForm({ ...restaurantForm, location: e.target.value })}
                     disabled={!isPdg}
                   />
+                </div>
+                <div className="space-y-3 rounded-xl border p-4">
+                  <Label>Coordonnées GPS du restaurant</Label>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Input inputMode="decimal" value={restaurantForm.latitude} onChange={(e) => setRestaurantForm({ ...restaurantForm, latitude: e.target.value })} placeholder="Latitude, ex. 12.3714" disabled={!isPdg} />
+                    <Input inputMode="decimal" value={restaurantForm.longitude} onChange={(e) => setRestaurantForm({ ...restaurantForm, longitude: e.target.value })} placeholder="Longitude, ex. -1.5197" disabled={!isPdg} />
+                  </div>
+                  {isPdg && <Button type="button" variant="outline" className="w-full gap-2" onClick={captureRestaurantLocation} disabled={restaurantLocating}>{restaurantLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}{restaurantLocating ? "Recherche de la position..." : "Utiliser ma position GPS"}</Button>}
+                  {restaurantForm.latitude && restaurantForm.longitude && <p className="flex items-center gap-2 text-sm text-green-700"><MapPin className="h-4 w-4" /> Position prête à être enregistrée.</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>

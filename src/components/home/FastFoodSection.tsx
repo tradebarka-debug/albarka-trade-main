@@ -186,7 +186,7 @@ const FastFoodSection = () => {
         </div>
         <div className="flex justify-center -mt-2 mb-6">
           <Link
-            to="/fast-food"
+            to="/restaurants-partenaires"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition hover:opacity-90"
           >
             Découvrir nos restaurants partenaires
@@ -223,12 +223,15 @@ const FastFoodSection = () => {
 
               key={index}
               href={`/restaurant/${restaurant.slug}`}
-              className="bg-card rounded-2xl overflow-hidden border border-border hover:scale-105 transition-all duration-300 min-w-[80vw] md:min-w-[420px] md:max-w-[380px] flex-shrink-0 snap-center"
+              className="group bg-card rounded-2xl overflow-hidden border border-border hover:-translate-y-2 hover:border-primary/40 hover:shadow-xl transition-all duration-500 min-w-[76vw] sm:min-w-[340px] md:min-w-[380px] md:max-w-[380px] flex-shrink-0 snap-center"
             >
               <img
                 src={restaurant.image_url}
                 alt={restaurant.name}
-                className="w-full h-52 object-cover"
+                loading="lazy"
+                decoding="async"
+                sizes="(max-width: 640px) 76vw, 380px"
+                className="h-44 w-full object-cover transition duration-700 group-hover:scale-105 md:h-52"
               />
 
               <div className="p-5">
