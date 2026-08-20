@@ -97,16 +97,22 @@ const Paiement = () => {
   const [disposableKits, setDisposableKits] = useState(false);
   const [kitQuantity, setKitQuantity] = useState(1);
   const [restaurantConfig, setRestaurantConfig] = useState<any>(null);
+  const [restaurantConfigLoading, setRestaurantConfigLoading] = useState(false);
+  const [restaurantConfigMissing, setRestaurantConfigMissing] = useState(false);
   const restaurantId = items.find((item) => item.restaurantId)?.restaurantId || null;
 
   useEffect(() => {
-    if (!restaurantId) { setRestaurantConfig(null); return; }
+    if (!restaurantId) { setRestaurantConfig(null); setRestaurantConfigMissing(false); return; }
+    setRestaurantConfigLoading(true);
+    setRestaurantConfigMissing(false);
     void (async () => {
-      const { data } = await (supabase.from("restaurant_partners") as any)
+      const { data, error } = await (supabase.from("restaurant_partners") as any)
         .select("id,name,whatsapp,telephone,payment_phone,payment_beneficiary,latitude,longitude,delivery_fee,delivery_fee_per_km,disposable_kit_fee")
         .eq("id", restaurantId)
         .maybeSingle();
       setRestaurantConfig(data);
+      setRestaurantConfigMissing(Boolean(error) || !data);
+      setRestaurantConfigLoading(false);
     })();
   }, [restaurantId]);
 
@@ -258,6 +264,13 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
 
       if (selectedMethod !== "cash_on_delivery" && !formData.transactionRef) {
         toast.error("Veuillez entrer la référence de transaction");
+        return;
+      }
+
+      if (restaurantId && (restaurantConfigLoading || restaurantConfigMissing || !restaurantConfig)) {
+        toast.error(restaurantConfigLoading
+          ? "Chargement du restaurant en cours. Réessayez dans un instant."
+          : "Ce panier utilise un ancien compte restaurant supprimé. Videz le panier puis ajoutez à nouveau les plats du restaurant Ramadan.");
         return;
       }
 

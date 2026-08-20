@@ -65,6 +65,7 @@ const defaultForm = {
 const AdminRestaurants = () => {
   const [restaurants, setRestaurants] = useState<RestaurantPartnerRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -173,6 +174,27 @@ const AdminRestaurants = () => {
       return;
     }
 
+    const parseCoordinate = (value: string) => {
+      const normalized = value.trim().replace(",", ".");
+      return normalized === "" ? null : Number(normalized);
+    };
+    const latitude = parseCoordinate(form.latitude);
+    const longitude = parseCoordinate(form.longitude);
+
+    if ((latitude == null) !== (longitude == null)) {
+      toast.error("Renseignez la latitude et la longitude ensemble");
+      return;
+    }
+    if (latitude != null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
+      toast.error("La latitude doit être comprise entre -90 et 90");
+      return;
+    }
+    if (longitude != null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+      toast.error("La longitude doit être comprise entre -180 et 180");
+      return;
+    }
+
+    setSaving(true);
     let imageUrl = form.image_url.trim();
     try {
       if (imageFile) {
@@ -181,6 +203,7 @@ const AdminRestaurants = () => {
     } catch (error) {
       console.error(error);
       toast.error("Erreur lors de l’envoi de l’image");
+      setSaving(false);
       return;
     }
 
@@ -198,8 +221,8 @@ const AdminRestaurants = () => {
       delivery_fee: Number(form.delivery_fee) || 0,
       delivery_fee_per_km: Number(form.delivery_fee_per_km) || 0,
       disposable_kit_fee: Number(form.disposable_kit_fee) || 0,
-      latitude: form.latitude === "" ? null : Number(form.latitude),
-      longitude: form.longitude === "" ? null : Number(form.longitude),
+      latitude,
+      longitude,
       estimated_delivery_time: form.estimated_delivery_time.trim(),
       is_available: form.is_available,
       category: form.category.trim(),
@@ -210,18 +233,20 @@ const AdminRestaurants = () => {
     };
 
     if (editingId) {
-      const { error } = await supabase.from("restaurant_partners").update(payload).eq("id", editingId);
+      const { error } = await supabase.from("restaurant_partners").update(payload).eq("id", editingId).select("id").single();
       if (error) {
         console.error(error);
-        toast.error("Erreur lors de la modification");
+        toast.error(`Modification non enregistrée : ${error.message}`);
+        setSaving(false);
         return;
       }
       toast.success("Restaurant modifié");
     } else {
-      const { error } = await supabase.from("restaurant_partners").insert(payload);
+      const { error } = await supabase.from("restaurant_partners").insert(payload).select("id").single();
       if (error) {
         console.error(error);
-        toast.error("Erreur lors de l’ajout");
+        toast.error(`Ajout non enregistré : ${error.message}`);
+        setSaving(false);
         return;
       }
       toast.success("Restaurant ajouté");
@@ -231,7 +256,8 @@ const AdminRestaurants = () => {
     setEditingId(null);
     setForm({ ...defaultForm, country_id: Number(localStorage.getItem("country_id") || 1) });
     resetImage();
-    loadRestaurants();
+    await loadRestaurants();
+    setSaving(false);
   };
 
   const deleteRestaurant = async (id: string) => {
@@ -430,7 +456,7 @@ const AdminRestaurants = () => {
 
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button onClick={saveRestaurant}>Sauvegarder</Button>
+            <Button onClick={saveRestaurant} disabled={saving}>{saving ? "Enregistrement..." : "Sauvegarder"}</Button>
           </div>
         </DialogContent>
       </Dialog>

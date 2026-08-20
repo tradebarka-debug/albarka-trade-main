@@ -56,6 +56,8 @@ import {
   User,
   Power,
   MapPin,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 import { format } from "date-fns";
@@ -132,6 +134,7 @@ interface ProfileOption {
 interface UserData {
   id: string;
   email: string;
+  telephone: string | null;
   full_name: string;
   created_at: string;
   last_sign_in_at: string | null;
@@ -157,6 +160,7 @@ interface UserData {
 
 interface UserFormData {
   email: string;
+  telephone: string;
   password: string;
   full_name: string;
 
@@ -196,6 +200,7 @@ const AdminUsers = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
 
@@ -203,6 +208,7 @@ const AdminUsers = () => {
 
   const [formData, setFormData] = useState<UserFormData>({
     email: "",
+    telephone: "",
     password: "",
     full_name: "",
     organization_id: null,
@@ -366,6 +372,7 @@ const AdminUsers = () => {
   const resetForm = () => {
     setFormData({
       email: "",
+      telephone: "",
       password: "",
       full_name: "",
       organization_id: null,
@@ -411,6 +418,7 @@ const AdminUsers = () => {
 
     setFormData({
       email: user.email || "",
+      telephone: user.telephone || "",
       password: "",
       full_name: user.full_name || "",
       organization_id: user.organization_id,
@@ -679,6 +687,12 @@ const AdminUsers = () => {
       return;
     }
 
+    const normalizedTelephone = formData.telephone.replace(/[\s()-]/g, "");
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizedTelephone)) {
+      toast({ title: "Téléphone invalide", description: "Utilisez l'indicatif du pays, par exemple +2250712345678.", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -696,6 +710,7 @@ const AdminUsers = () => {
           : {}),
 
         email: formData.email,
+        telephone: normalizedTelephone,
         password:
           formData.password || undefined,
         full_name: formData.full_name,
@@ -1138,6 +1153,12 @@ const AdminUsers = () => {
                 />
               </div>
 
+              <div className="grid gap-2">
+                <Label htmlFor="telephone">Numéro de téléphone</Label>
+                <Input id="telephone" type="tel" value={formData.telephone} onChange={(e) => setFormData({ ...formData, telephone: e.target.value })} placeholder="+2250712345678" required />
+                <p className="text-xs text-muted-foreground">Ce numéro permettra aussi de se connecter au compte.</p>
+              </div>
+
               {/* -------------------------------------------------
                   PASSWORD
               ------------------------------------------------- */}
@@ -1149,21 +1170,10 @@ const AdminUsers = () => {
                     "(laisser vide pour ne pas changer)"}
                 </Label>
 
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      password:
-                        e.target.value,
-                    })
-                  }
-                  placeholder="••••••••"
-                  required={!editingUser}
-                  minLength={6}
-                />
+                <div className="relative">
+                  <Input id="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••" required={!editingUser} minLength={6} className="pr-11" />
+                  <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground" aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                </div>
               </div>
 
               {/* -------------------------------------------------

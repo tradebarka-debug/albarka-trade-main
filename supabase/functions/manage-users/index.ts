@@ -56,10 +56,15 @@ function jsonResponse(
 
 function validateInput(data: {
   email?: string;
+  telephone?: string;
   password?: string;
   full_name?: string;
 }) {
   const errors: string[] = [];
+
+  if (data.telephone !== undefined && !/^\+[1-9]\d{7,14}$/.test(String(data.telephone).replace(/[\s()-]/g, ""))) {
+    errors.push("Le téléphone doit contenir l'indicatif du pays");
+  }
 
   if (data.email !== undefined) {
     if (
@@ -485,6 +490,7 @@ Deno.serve(async (req) => {
           `
           id,
           email,
+          telephone,
           nom,
           role,
           created_at,
@@ -568,6 +574,7 @@ Deno.serve(async (req) => {
           return {
             id: profile.id,
             email: profile.email,
+            telephone: profile.telephone,
             full_name: profile.nom || "",
             created_at: profile.created_at,
             last_sign_in_at: null,
@@ -613,6 +620,7 @@ Deno.serve(async (req) => {
 
       const {
         email,
+        telephone,
         password,
         full_name,
         organization_id,
@@ -623,6 +631,7 @@ Deno.serve(async (req) => {
 
       const validationErrors = validateInput({
         email,
+        telephone,
         password,
         full_name,
       });
@@ -634,6 +643,9 @@ Deno.serve(async (req) => {
           corsHeaders
         );
       }
+
+      if (!telephone) return jsonResponse({ error: "Le téléphone est obligatoire" }, 400, corsHeaders);
+      const normalizedTelephone = String(telephone).replace(/[\s()-]/g, "");
 
       if (!organization_id) {
         return jsonResponse(
@@ -824,8 +836,10 @@ Deno.serve(async (req) => {
       } =
         await supabaseAdmin.auth.admin.createUser({
           email,
+          phone: normalizedTelephone,
           password,
           email_confirm: true,
+          phone_confirm: true,
           user_metadata: {
             full_name,
           },
@@ -858,6 +872,7 @@ Deno.serve(async (req) => {
           .upsert({
             id: newUserId,
             email,
+            telephone: normalizedTelephone,
             nom: full_name,
             role: null,
             organization_id,
@@ -952,6 +967,7 @@ Deno.serve(async (req) => {
       const {
         userId,
         email,
+        telephone,
         password,
         full_name,
         organization_id,
@@ -1067,6 +1083,11 @@ Deno.serve(async (req) => {
         authUpdate.email = email;
       }
 
+      if (telephone) {
+        authUpdate.phone = String(telephone).replace(/[\s()-]/g, "");
+        authUpdate.phone_confirm = true;
+      }
+
       if (password) {
         authUpdate.password = password;
       }
@@ -1092,6 +1113,7 @@ Deno.serve(async (req) => {
        */
       const profileUpdate: Record<string, unknown> = {
         email,
+        telephone: telephone ? String(telephone).replace(/[\s()-]/g, "") : undefined,
         nom: full_name,
       };
 

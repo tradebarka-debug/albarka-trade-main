@@ -14,7 +14,8 @@ import {
   UtensilsCrossed,
   Factory,
   ClipboardList,
-  ImageIcon
+  ImageIcon,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,7 @@ const AdminSidebar = () => {
 
       {/* Footer */}
       <div className="p-2 border-t border-border space-y-1">
+        <Link to="/compte/changer-mot-de-passe" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><KeyRound className="h-5 w-5 shrink-0" />{!collapsed && <span>Changer le mot de passe</span>}</Link>
         <Link
           to="/"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

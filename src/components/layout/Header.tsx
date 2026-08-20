@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, ShoppingCart, Phone, Search, LogIn, LogOut, User, Settings } from "lucide-react";
+import { Menu, X, ShoppingCart, Phone, Search, LogIn, LogOut, User, Settings, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -133,6 +133,7 @@ const Header = () => {
                   Espace administratif
                 </Link>
               </DropdownMenuItem>}
+              <DropdownMenuItem asChild><Link to="/compte/changer-mot-de-passe" className="flex items-center gap-2"><KeyRound className="h-4 w-4" />Changer le mot de passe</Link></DropdownMenuItem>
               <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-destructive">
                 <LogOut className="w-4 h-4" />
                 Déconnexion
@@ -171,6 +172,7 @@ const Header = () => {
               <Settings className="w-5 h-5" />
               Espace administratif
             </Link>}
+            <Link to="/compte/changer-mot-de-passe" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-primary hover:bg-muted"><KeyRound className="h-5 w-5" />Changer le mot de passe</Link>
             <button onClick={() => {
               handleSignOut();
               setIsMenuOpen(false);

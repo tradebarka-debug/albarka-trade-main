@@ -37,6 +37,7 @@ import RestaurantPartners from "./pages/RestaurantPartners";
 import Liquidation from "./pages/Liquidation";
 import Livraisons from "./pages/Livraisons";
 import Auth from "./pages/Auth";
+import { ChangePassword, ForgotPassword } from "./pages/AccountPassword";
 import Suppliers from "./pages/Suppliers";
 import SupplierDetails from "./pages/SupplierDetails";
 import Factories from "./pages/Factories";
@@ -227,6 +228,8 @@ const App = () => (
                         <Route path="/liquidation" element={<Liquidation />} />
                         <Route path="/livraisons" element={<Livraisons />} />
                         <Route path="/auth" element={<Auth />} />
+                        <Route path="/compte/mot-de-passe-oublie" element={<ForgotPassword />} />
+                        <Route path="/compte/changer-mot-de-passe" element={<ChangePassword />} />
                         <Route path="/espace-utilisateur" element={<UserSpace />} />
                         <Route path="/restaurant/:slug" element={<RestaurantPage />} />
                         <Route path="/suppliers" element={<Suppliers />} />

@@ -254,13 +254,15 @@ Deno.serve(async (req) => {
     if (action === "create_organization_employee") {
       const fullName = String(params.full_name ?? "").trim();
       const email = String(params.email ?? "").trim().toLowerCase();
+      const telephone = String(params.telephone ?? "").replace(/[\s()-]/g, "");
       const password = String(params.password ?? "");
       const roleId = Number(params.organization_role_id);
       const outletId = Number(params.restaurant_outlet_id);
 
       if (fullName.length < 2) return jsonResponse({ error: "Le nom complet est obligatoire" }, 400, corsHeaders);
       if (!/^\S+@\S+\.\S+$/.test(email)) return jsonResponse({ error: "L'adresse e-mail est invalide" }, 400, corsHeaders);
-      if (password.length < 8) return jsonResponse({ error: "Le mot de passe provisoire doit contenir au moins 8 caractères" }, 400, corsHeaders);
+      if (!/^\+[1-9]\d{7,14}$/.test(telephone)) return jsonResponse({ error: "Le téléphone doit inclure l'indicatif du pays, par exemple +2250712345678" }, 400, corsHeaders);
+      if (password.length < 6) return jsonResponse({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400, corsHeaders);
       if (!Number.isFinite(roleId)) return jsonResponse({ error: "Le poste est obligatoire" }, 400, corsHeaders);
       if (!Number.isFinite(outletId)) return jsonResponse({ error: "Le point de vente est obligatoire" }, 400, corsHeaders);
 
@@ -284,8 +286,10 @@ Deno.serve(async (req) => {
 
       const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
+        phone: telephone,
         password,
         email_confirm: true,
+        phone_confirm: true,
         user_metadata: { full_name: fullName },
       });
       if (createError) return jsonResponse({ error: createError.message }, 400, corsHeaders);
@@ -295,6 +299,7 @@ Deno.serve(async (req) => {
       const { error: employeeProfileError } = await supabaseAdmin.from("profiles").upsert({
         id: newUserId,
         email,
+        telephone,
         nom: fullName,
         role: null,
         organization_id: organizationId,
