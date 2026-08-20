@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +89,7 @@ const Paiement = () => {
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [showManualLocation, setShowManualLocation] = useState(false);
+  const automaticLocationRequested = useRef(false);
   const [manualLatitude, setManualLatitude] = useState("");
   const [manualLongitude, setManualLongitude] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
@@ -120,7 +121,7 @@ const Paiement = () => {
     ? haversineDistance(coordinates.latitude, coordinates.longitude, Number(restaurantConfig.latitude), Number(restaurantConfig.longitude))
     : 0;
   const isDistanceSuspicious = requiresDelivery && distanceKm > 100;
-  const deliveryFee = requiresDelivery && restaurantId
+  const deliveryFee = requiresDelivery && restaurantId && !isDistanceSuspicious
     ? Math.ceil(Number(restaurantConfig?.delivery_fee || 0) + distanceKm * Number(restaurantConfig?.delivery_fee_per_km || 0))
     : 0;
   const disposableKitFee = disposableKits ? Math.max(1, kitQuantity) * Number(restaurantConfig?.disposable_kit_fee || 0) : 0;
@@ -143,14 +144,12 @@ const Paiement = () => {
     }
   };
 
-  const captureLocation = () => {
+  const captureLocation = useCallback(() => {
     if (!window.isSecureContext) {
-      setShowManualLocation(true);
       toast.error("La position automatique est bloquée sur une adresse HTTP locale. Utilisez HTTPS ou saisissez les coordonnées manuellement.");
       return;
     }
     if (!navigator.geolocation) {
-      setShowManualLocation(true);
       toast.error("La géolocalisation n'est pas disponible sur cet appareil.");
       return;
     }
@@ -165,18 +164,17 @@ const Paiement = () => {
       },
       (error) => {
         setIsLocating(false);
-        setShowManualLocation(true);
         if (error.code === error.PERMISSION_DENIED) {
-          toast.error("Autorisation refusée. Activez la localisation pour ce site ou saisissez les coordonnées manuellement.");
+          toast.error("Autorisation refusée. Autorisez la localisation dans votre navigateur, puis appuyez sur Réessayer.");
         } else if (error.code === error.TIMEOUT) {
-          toast.error("La recherche de position a expiré. Réessayez à l'extérieur ou saisissez-la manuellement.");
+          toast.error("La recherche a pris trop de temps. Activez le GPS puis appuyez sur Réessayer.");
         } else {
-          toast.error("Position indisponible. Vous pouvez saisir les coordonnées manuellement.");
+          toast.error("Position indisponible. Activez le GPS puis appuyez sur Réessayer.");
         }
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
-  };
+  }, []);
 
   const saveManualLocation = () => {
     const latitude = Number(manualLatitude.replace(",", "."));
@@ -286,14 +284,12 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
 
       if (requiresDelivery && !coordinates) {
         toast.error("La position GPS est obligatoire pour une livraison. Ajoutez votre position avant de continuer.");
-        setShowManualLocation(true);
         setStep(1);
         return;
       }
 
       if (isDistanceSuspicious) {
-        toast.error("La position détectée est anormalement éloignée du restaurant. Vérifiez votre GPS ou saisissez votre position manuellement.");
-        setShowManualLocation(true);
+        toast.error("La position enregistrée pour le restaurant semble incorrecte. La commande est bloquée pour éviter des frais de livraison erronés.");
         return;
       }
 
@@ -380,6 +376,13 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (step !== 1 || !requiresDelivery || coordinates || automaticLocationRequested.current) return;
+    automaticLocationRequested.current = true;
+    const timer = window.setTimeout(() => captureLocation(), 500);
+    return () => window.clearTimeout(timer);
+  }, [captureLocation, coordinates, requiresDelivery, step]);
 
   const basePaymentMethod = paymentMethods.find(m => m.id === selectedMethod)!;
   const selectedPaymentMethod = restaurantId && selectedMethod !== "cash_on_delivery"
@@ -545,14 +548,14 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
                     </p>
                   </div>
                   <div className="rounded-xl border border-border bg-muted/30 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3">
                       <div>
                         <p className="font-medium">Position de livraison</p>
-                        <p className="text-sm text-muted-foreground">Obligatoire pour une livraison, afin que le livreur puisse vous trouver.</p>
+                        <p className="text-sm text-muted-foreground">Validez la demande du navigateur. Votre position sera enregistrée automatiquement, sans saisir de coordonnées.</p>
                       </div>
-                      <Button type="button" variant="outline" onClick={captureLocation} disabled={isLocating} className="gap-2">
+                      <Button type="button" onClick={captureLocation} disabled={isLocating} className="min-h-14 w-full gap-2 text-base">
                         <LocateFixed className="w-4 h-4" />
-                        {isLocating ? "Localisation..." : coordinates ? "Position ajoutée" : "Ajouter ma position"}
+                        {isLocating ? "Recherche de votre position..." : coordinates ? "Position enregistrée" : "Autoriser et enregistrer ma position"}
                       </Button>
                     </div>
                     {coordinates && (
@@ -576,8 +579,8 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
                         </div>
                       </div>
                     )}
-                    <button type="button" className="mt-3 text-sm font-medium text-muted-foreground underline" onClick={() => setShowManualLocation((visible) => !visible)}>
-                      {showManualLocation ? "Masquer l'option avancée" : "Option avancée : saisir les coordonnées"}
+                    <button type="button" className="mt-3 text-xs font-medium text-muted-foreground underline" onClick={() => setShowManualLocation((visible) => !visible)}>
+                      {showManualLocation ? "Masquer l'assistance avancée" : "Le GPS ne fonctionne pas ? Assistance avancée"}
                     </button>
                     {showManualLocation && (
                       <div className="mt-3 grid gap-3 rounded-lg border border-border bg-background p-3 sm:grid-cols-2">
@@ -602,8 +605,8 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
                       <div className="space-y-1 border-t pt-3 text-sm">
                         {requiresDelivery && <div className="flex justify-between"><span>Distance estimée</span><strong className={isDistanceSuspicious ? "text-destructive" : ""}>{distanceKm ? `${distanceKm.toFixed(1)} km` : "Ajoutez votre position GPS"}</strong></div>}
                         {requiresDelivery && locationAccuracy != null && <div className="flex justify-between text-xs text-muted-foreground"><span>Précision GPS</span><span>± {Math.round(locationAccuracy)} m</span></div>}
-                        {isDistanceSuspicious && <p className="text-sm text-destructive">Position incohérente : réactivez le GPS ou utilisez la saisie manuelle avant de valider.</p>}
-                        <div className="flex justify-between"><span>Frais de livraison</span><strong>{formatPrice(deliveryFee)}</strong></div>
+                        {isDistanceSuspicious && <p className="text-sm text-destructive">La position GPS du restaurant semble incorrecte. Aucun frais ne sera calculé tant qu’elle n’est pas corrigée.</p>}
+                        <div className="flex justify-between"><span>Frais de livraison</span><strong>{isDistanceSuspicious ? "À vérifier" : formatPrice(deliveryFee)}</strong></div>
                         {disposableKits && <div className="flex justify-between"><span>Kits jetables</span><strong>{formatPrice(disposableKitFee)}</strong></div>}
                       </div>
                     </div>
