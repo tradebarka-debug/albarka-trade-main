@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, Handshake, Search, ShoppingBag, Truck, UtensilsCrossed } from "lucide-react";
+import { Building2, Handshake, QrCode, Search, ShoppingBag, Truck, UtensilsCrossed } from "lucide-react";
 
 const actions = [
   { label: "Acheter", description: "Produits et bons plans", path: "/boutique", icon: ShoppingBag, color: "bg-amber-500" },
@@ -8,6 +8,7 @@ const actions = [
   { label: "Livrer", description: "Colis et livraisons", path: "/livraisons", icon: Truck, color: "bg-sky-600" },
   { label: "Trouver un fournisseur", description: "Découvrir le réseau", path: "/suppliers", icon: Building2, color: "bg-emerald-600" },
   { label: "Devenir partenaire", description: "Rejoindre le réseau", path: "/devenir-partenaire", icon: Handshake, color: "bg-violet-600" },
+  { label: "Obtenir un code promo", description: "Partager et gagner une commission", path: "/code-promo", icon: QrCode, color: "bg-rose-600" },
 ];
 
 const HomeActionHub = () => {

@@ -16,6 +16,7 @@ import {
   ClipboardList,
   ImageIcon,
   KeyRound,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ const menuItems = [
   { path: "/admin/applications", label: "Candidatures emplois", icon: Briefcase },
   { path: "/admin/candidature", label: "Candidatures spontanées", icon: Briefcase },
   { path: "/admin/paiements", label: "Paiements", icon: CreditCard },
+  { path: "/admin/commissions-promo", label: "Commissions codes promo", icon: Percent },
   { path: "/admin/service-requests", label: "Demandes de services", icon: Wrench },
   { path: "/admin/orders", label: "Commandes", icon: Package },
   { path: "/admin/demandes-partenaires", label: "Demandes partenaires", icon: ClipboardList },

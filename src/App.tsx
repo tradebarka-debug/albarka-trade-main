@@ -69,6 +69,7 @@ import BookingVerification from "@/pages/BookingVerification";
 import UserSpace from "@/pages/UserSpace";
 import GlobalBackButton from "@/components/GlobalBackButton";
 import ReferralLanding from "@/pages/ReferralLanding";
+import PromoAmbassador from "@/pages/PromoAmbassador";
 
 // Admin pages
 import AdminLayout from "./components/admin/AdminLayout";
@@ -87,6 +88,7 @@ import AdminApplications from "./pages/admin/AdminApplications";
 import AdminServiceRequests from "./pages/admin/AdminServiceRequests";
 import AdminPartnerApplications from "./pages/admin/AdminPartnerApplications";
 import OrganisationDashboard from "./pages/organisation/OrganisationDashboard";
+import AdminPromoCommissions from "./pages/admin/AdminPromoCommissions";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -117,6 +119,7 @@ const App = () => (
                 <Route path="candidature" element={<AdminCandidature />} />
                 <Route path="service-requests" element={<AdminServiceRequests />} />
                 <Route path="paiements" element={<AdminPayments />} />
+                <Route path="commissions-promo" element={<AdminPromoCommissions />} />
                 <Route path="voyages" element={<AdminVoyages />} />
                 <Route path="liquidation" element={<AdminLiquidation />} />
                 <Route path="utilisateurs" element={<AdminUsers />} />
@@ -213,6 +216,7 @@ const App = () => (
                         <Route path="/" element={<Index />} />
                         <Route path="/boutique" element={<Boutique />} />
                         <Route path="/offres" element={<ReferralLanding />} />
+                        <Route path="/code-promo" element={<PromoAmbassador />} />
                         <Route path="/panier" element={<Panier />} />
                         <Route path="/paiement" element={<Paiement />} />
                         <Route path="/suivi-livraison" element={<DeliveryTracking />} />

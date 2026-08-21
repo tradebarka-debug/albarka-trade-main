@@ -28,7 +28,7 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 }
 
 // Champs sensibles qu'on ne renvoie jamais au navigateur
-const PRIVATE_FIELDS = new Set(["pin", "otp", "otp_expire"]);
+const PRIVATE_FIELDS = new Set(["pin", "otp", "otp_expire", "password_hash"]);
 
 function sanitize(row: Record<string, unknown>) {
   const clean: Record<string, unknown> = {};
@@ -75,6 +75,37 @@ async function verifySessionToken(secret: string, token: string, expectedCode: s
   return true;
 }
 
+function bytesToBase64(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes));
+}
+
+async function hashPassword(password: string, salt = crypto.getRandomValues(new Uint8Array(16))) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 120000 }, key, 256);
+  return `pbkdf2_sha256$120000$${bytesToBase64(salt)}$${bytesToBase64(new Uint8Array(bits))}`;
+}
+
+async function verifyPassword(password: string, storedHash: string) {
+  const [algorithm, iterations, saltValue, expected] = storedHash.split("$");
+  if (algorithm !== "pbkdf2_sha256" || !iterations || !saltValue || !expected) return false;
+  const salt = Uint8Array.from(atob(saltValue), (character) => character.charCodeAt(0));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: Number(iterations) }, key, 256);
+  const actual = bytesToBase64(new Uint8Array(bits));
+  if (actual.length !== expected.length) return false;
+  let difference = 0;
+  for (let index = 0; index < actual.length; index += 1) difference |= actual.charCodeAt(index) ^ expected.charCodeAt(index);
+  return difference === 0;
+}
+
+function normalizeContact(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function generateAmbassadorCode() {
+  return `ALB-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -100,14 +131,73 @@ Deno.serve(async (req) => {
     if (action === "validate_promo") {
       const promoCode = String((params as any).code || "").trim().toUpperCase();
       if (!promoCode || promoCode.length > 80) return jsonResponse({ valid: false }, 200, corsHeaders);
-      const [{ data: representant }, { data: application }, { data: commercial }, { data: partner }] = await Promise.all([
+      const [{ data: ambassador }, { data: representant }, { data: application }, { data: commercial }, { data: partner }] = await Promise.all([
+        supabaseAdmin.from("ambassadors").select("full_name").eq("promo_code", promoCode).eq("status", "active").maybeSingle(),
         supabaseAdmin.from("representants").select("nom, prenom").eq("code", promoCode).maybeSingle(),
         supabaseAdmin.from("partner_applications").select("full_name").eq("partner_code", promoCode).eq("status", "approved").maybeSingle(),
         supabaseAdmin.from("commercials").select("first_name, last_name").eq("referral_code", promoCode).eq("status", "active").maybeSingle(),
         supabaseAdmin.from("partners").select("name").or(`code.eq.${promoCode},referral_code.eq.${promoCode}`).eq("status", "active").maybeSingle(),
       ]);
-      const displayName = representant ? [representant.prenom, representant.nom].filter(Boolean).join(" ") : application?.full_name || (commercial ? [commercial.first_name, commercial.last_name].filter(Boolean).join(" ") : "") || partner?.name;
+      const displayName = ambassador?.full_name || (representant ? [representant.prenom, representant.nom].filter(Boolean).join(" ") : application?.full_name || (commercial ? [commercial.first_name, commercial.last_name].filter(Boolean).join(" ") : "") || partner?.name);
       return jsonResponse({ valid: Boolean(displayName), displayName: displayName || null }, 200, corsHeaders);
+    }
+
+    if (action === "ambassador_signup") {
+      const fullName = String((params as any).full_name || "").trim();
+      const phone = normalizeContact((params as any).phone);
+      const email = normalizeContact((params as any).email);
+      const password = String((params as any).password || "");
+      if (fullName.length < 2) return jsonResponse({ error: "Indiquez votre nom complet" }, 400, corsHeaders);
+      if (!phone && !email) return jsonResponse({ error: "Indiquez un téléphone ou un email" }, 400, corsHeaders);
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonResponse({ error: "Adresse email invalide" }, 400, corsHeaders);
+      if (!/^\d{4}$/.test(password)) return jsonResponse({ error: "Le mot de passe doit contenir exactement 4 chiffres" }, 400, corsHeaders);
+
+      const [{ data: phoneAccount }, { data: emailAccount }] = await Promise.all([
+        phone ? supabaseAdmin.from("ambassadors").select("id").eq("phone", phone).maybeSingle() : Promise.resolve({ data: null }),
+        email ? supabaseAdmin.from("ambassadors").select("id").eq("email", email).maybeSingle() : Promise.resolve({ data: null }),
+      ]);
+      if (phoneAccount || emailAccount) return jsonResponse({ error: "Un compte existe déjà avec ce téléphone ou cet email" }, 409, corsHeaders);
+
+      const promoCode = generateAmbassadorCode();
+      const passwordHash = await hashPassword(password);
+      const { data: ambassador, error } = await supabaseAdmin.from("ambassadors").insert({
+        full_name: fullName, phone: phone || null, email: email || null,
+        password_hash: passwordHash, promo_code: promoCode,
+      }).select("id, full_name, phone, email, promo_code, status, total_orders, total_commission, available_commission").single();
+      if (error) throw error;
+      const sessionToken = await createSessionToken(sessionSecret, promoCode);
+      return jsonResponse({ ambassador, sessionToken }, 200, corsHeaders);
+    }
+
+    if (action === "ambassador_login") {
+      const identifier = normalizeContact((params as any).identifier);
+      const password = String((params as any).password || "");
+      if (!identifier || !password) return jsonResponse({ error: "Identifiant et mot de passe obligatoires" }, 400, corsHeaders);
+      const identifierColumn = identifier.includes("@") ? "email" : "phone";
+      const { data: ambassador, error } = await supabaseAdmin.from("ambassadors").select("*")
+        .eq(identifierColumn, identifier).maybeSingle();
+      if (error) throw error;
+      if (!ambassador || ambassador.status !== "active" || !(await verifyPassword(password, ambassador.password_hash))) {
+        return jsonResponse({ error: "Téléphone/email ou mot de passe incorrect" }, 401, corsHeaders);
+      }
+      const sessionToken = await createSessionToken(sessionSecret, ambassador.promo_code);
+      return jsonResponse({ ambassador: sanitize(ambassador), sessionToken }, 200, corsHeaders);
+    }
+
+    if (action === "ambassador_profile") {
+      const promoCode = String((params as any).promoCode || "").trim().toUpperCase();
+      const sessionToken = String((params as any).sessionToken || "");
+      if (!(await verifySessionToken(sessionSecret, sessionToken, promoCode))) {
+        return jsonResponse({ error: "Session invalide, veuillez vous reconnecter" }, 401, corsHeaders);
+      }
+      const { data: ambassador, error } = await supabaseAdmin.from("ambassadors").select("*").eq("promo_code", promoCode).maybeSingle();
+      if (error) throw error;
+      if (!ambassador) return jsonResponse({ error: "Ambassadeur introuvable" }, 404, corsHeaders);
+      const { data: commissions, error: commissionsError } = await supabaseAdmin.from("ambassador_commissions")
+        .select("id, order_total, commission_amount, status, created_at").eq("ambassador_id", ambassador.id)
+        .order("created_at", { ascending: false }).limit(30);
+      if (commissionsError) throw commissionsError;
+      return jsonResponse({ ambassador: sanitize(ambassador), commissions: commissions || [] }, 200, corsHeaders);
     }
 
     if (action === "signup") {
