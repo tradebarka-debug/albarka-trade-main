@@ -21,7 +21,8 @@ import { Switch } from "@/components/ui/switch";
 import { useFastFoodItems, FastFoodItem, FastFoodFormData, fastFoodCategories } from "@/hooks/useFastFoodItems";
 
 const AdminFastFood = () => {
-  const { items, isLoading, createItem, updateItem, deleteItem } = useFastFoodItems();
+  const [countryId, setCountryId] = useState(1);
+  const { items, isLoading, createItem, updateItem, deleteItem } = useFastFoodItems(countryId);
   const [restaurants, setRestaurants] = useState<any[]>([]);
 
   const [newRestaurant, setNewRestaurant] = useState({
@@ -59,7 +60,7 @@ const AdminFastFood = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<FastFoodItem | null>(null);
   const [formData, setFormData] = useState<FastFoodFormData>({
-    name: "", description: "", price: "", category: "Burgers", isActive: true, sortOrder: "0",
+    name: "", description: "", price: "", category: "Burgers", isActive: true, sortOrder: "0", countryId: 1,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -83,11 +84,12 @@ const AdminFastFood = () => {
         category: item.category,
         isActive: item.is_active,
         sortOrder: item.sort_order.toString(),
+        countryId: item.country_id || countryId,
       });
       setImagePreview(item.image || null);
     } else {
       setEditingItem(null);
-      setFormData({ name: "", description: "", price: "", category: "Burgers", isActive: true, sortOrder: "0" });
+      setFormData({ name: "", description: "", price: "", category: "Burgers", isActive: true, sortOrder: "0", countryId });
       setImagePreview(null);
     }
     setImageFile(null);
@@ -152,6 +154,7 @@ const AdminFastFood = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      if (!window.confirm("Supprimer définitivement ce plat ?")) return;
       await deleteItem(id);
       toast({ title: "Plat supprimé", description: "Le plat a été supprimé" });
     } catch (error) {
@@ -180,6 +183,10 @@ const AdminFastFood = () => {
           <h1 className="text-3xl font-display font-bold">Menu Fast Food</h1>
           <p className="text-muted-foreground">Gérez les {items.length} plats du menu</p>
         </div>
+        <Select value={String(countryId)} onValueChange={(value) => setCountryId(Number(value))}>
+          <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Pays" /></SelectTrigger>
+          <SelectContent><SelectItem value="1">Burkina Faso</SelectItem><SelectItem value="2">Côte d’Ivoire</SelectItem></SelectContent>
+        </Select>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -237,6 +244,14 @@ const AdminFastFood = () => {
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Pays de publication</Label>
+                <Select value={String(formData.countryId)} onValueChange={(value) => setFormData({ ...formData, countryId: Number(value) })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="1">Burkina Faso</SelectItem><SelectItem value="2">Côte d’Ivoire</SelectItem></SelectContent>
                 </Select>
               </div>
 

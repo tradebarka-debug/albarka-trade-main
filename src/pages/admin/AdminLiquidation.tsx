@@ -21,7 +21,7 @@ const AdminLiquidation = () => {
   const [editingValues, setEditingValues] = useState<Record<string, { liquidationPrice: string; liquidationUntil: string }>>({});
 
   const liquidationItems = useMemo(() => {
-    return products.filter((product) => product.is_liquidation || product.liquidation_price !== null);
+    return products.filter((product) => product.is_liquidation === true);
   }, [products]);
 
   const availableProducts = useMemo(() => {
@@ -76,16 +76,19 @@ const AdminLiquidation = () => {
     setSavingId(targetProduct.id);
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("products")
         .update({
           is_liquidation: true,
           liquidation_price: Number(newLiquidationPrice) || targetProduct.price,
           liquidation_until: new Date(newLiquidationUntil).toISOString(),
         })
-        .eq("id", targetProduct.id);
+        .eq("id", targetProduct.id)
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("Mise à jour refusée par Supabase");
 
       toast({
         title: "Produit ajouté à la liquidation",
@@ -117,16 +120,19 @@ const AdminLiquidation = () => {
     setSavingId(product.id);
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("products")
         .update({
           is_liquidation: true,
           liquidation_price: Number(draft.liquidationPrice) || product.price,
           liquidation_until: draft.liquidationUntil ? new Date(draft.liquidationUntil).toISOString() : null,
         })
-        .eq("id", product.id);
+        .eq("id", product.id)
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("Mise à jour refusée par Supabase");
 
       toast({
         title: "Liquidation mise à jour",
@@ -151,16 +157,19 @@ const AdminLiquidation = () => {
     setSavingId(product.id);
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("products")
         .update({
           is_liquidation: nextValue,
           liquidation_price: nextValue ? product.liquidation_price ?? product.price : null,
           liquidation_until: nextValue ? new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString() : null,
         })
-        .eq("id", product.id);
+        .eq("id", product.id)
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("Mise à jour refusée par Supabase");
 
       toast({
         title: nextValue ? "Produit mis en liquidation" : "Produit retiré de la liquidation",

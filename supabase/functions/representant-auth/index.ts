@@ -106,6 +106,12 @@ function generateAmbassadorCode() {
   return `ALB-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
+function normalizePromoCode(value: unknown) {
+  return String(value || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase().trim().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -147,10 +153,14 @@ Deno.serve(async (req) => {
       const phone = normalizeContact((params as any).phone);
       const email = normalizeContact((params as any).email);
       const password = String((params as any).password || "");
+      const requestedCode = normalizePromoCode((params as any).desired_code);
       if (fullName.length < 2) return jsonResponse({ error: "Indiquez votre nom complet" }, 400, corsHeaders);
       if (!phone && !email) return jsonResponse({ error: "Indiquez un téléphone ou un email" }, 400, corsHeaders);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonResponse({ error: "Adresse email invalide" }, 400, corsHeaders);
       if (!/^\d{4}$/.test(password)) return jsonResponse({ error: "Le mot de passe doit contenir exactement 4 chiffres" }, 400, corsHeaders);
+      if (requestedCode && (requestedCode.length < 4 || requestedCode.length > 20)) {
+        return jsonResponse({ error: "Le code choisi doit contenir entre 4 et 20 caractères" }, 400, corsHeaders);
+      }
 
       const [{ data: phoneAccount }, { data: emailAccount }] = await Promise.all([
         phone ? supabaseAdmin.from("ambassadors").select("id").eq("phone", phone).maybeSingle() : Promise.resolve({ data: null }),
@@ -158,7 +168,16 @@ Deno.serve(async (req) => {
       ]);
       if (phoneAccount || emailAccount) return jsonResponse({ error: "Un compte existe déjà avec ce téléphone ou cet email" }, 409, corsHeaders);
 
-      const promoCode = generateAmbassadorCode();
+      const promoCode = requestedCode || generateAmbassadorCode();
+      const [{ data: ambassadorCode }, { data: representativeCode }, { data: commercialCode }, { data: partnerCode }] = await Promise.all([
+        supabaseAdmin.from("ambassadors").select("id").eq("promo_code", promoCode).maybeSingle(),
+        supabaseAdmin.from("representants").select("id").eq("code", promoCode).maybeSingle(),
+        supabaseAdmin.from("commercials").select("id").eq("referral_code", promoCode).maybeSingle(),
+        supabaseAdmin.from("partner_applications").select("id").eq("partner_code", promoCode).maybeSingle(),
+      ]);
+      if (ambassadorCode || representativeCode || commercialCode || partnerCode) {
+        return jsonResponse({ error: "Ce nom de code promo est déjà utilisé. Essayez-en un autre." }, 409, corsHeaders);
+      }
       const passwordHash = await hashPassword(password);
       const { data: ambassador, error } = await supabaseAdmin.from("ambassadors").insert({
         full_name: fullName, phone: phone || null, email: email || null,

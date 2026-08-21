@@ -264,15 +264,19 @@ const AdminRestaurants = () => {
     const confirmDelete = window.confirm("Supprimer ce restaurant partenaire ?");
     if (!confirmDelete) return;
 
-    const { error } = await supabase.from("restaurant_partners").delete().eq("id", id);
+    const { data, error } = await supabase.from("restaurant_partners").delete().eq("id", id).select("id").maybeSingle();
     if (error) {
       console.error(error);
-      toast.error("Suppression impossible");
+      toast.error(`Suppression impossible : ${error.message}`);
+      return;
+    }
+    if (!data) {
+      toast.error("Le restaurant n'a pas été supprimé. Vérifiez vos droits administrateur.");
       return;
     }
 
     toast.success("Restaurant supprimé");
-    loadRestaurants();
+    await loadRestaurants();
   };
 
   const restaurantUrl = qrRestaurant?.slug

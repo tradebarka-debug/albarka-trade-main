@@ -36,7 +36,8 @@ import { Switch } from "@/components/ui/switch";
 import { useProducts, Product, ProductFormData } from "@/hooks/useProducts";
 
 const AdminProducts = () => {
-  const { products, isLoading, createProduct, updateProduct, deleteProduct } = useProducts();
+  const [countryId, setCountryId] = useState(1);
+  const { products, isLoading, createProduct, updateProduct, deleteProduct } = useProducts(countryId);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -49,6 +50,7 @@ const AdminProducts = () => {
     description: "",
     inStock: true,
     stockQuantity: "0",
+    countryId: 1,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -73,11 +75,12 @@ const AdminProducts = () => {
         description: product.description || "",
         inStock: product.in_stock,
         stockQuantity: (product.stock_quantity || 0).toString(),
+        countryId: product.country_id || countryId,
       });
       setImagePreview(product.image || null);
     } else {
       setEditingProduct(null);
-      setFormData({ name: "", category: "", price: "", unit: "", description: "", inStock: true, stockQuantity: "0" });
+      setFormData({ name: "", category: "", price: "", unit: "", description: "", inStock: true, stockQuantity: "0", countryId });
       setImagePreview(null);
     }
     setImageFile(null);
@@ -175,6 +178,7 @@ const AdminProducts = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      if (!window.confirm("Supprimer définitivement ce produit ?")) return;
       await deleteProduct(id);
       toast({ title: "Produit supprimé", description: "Le produit a été supprimé" });
     } catch (error) {
@@ -211,6 +215,10 @@ const AdminProducts = () => {
             Gérez vos {products.length} produits de la boutique
           </p>
         </div>
+        <Select value={String(countryId)} onValueChange={(value) => setCountryId(Number(value))}>
+          <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Pays" /></SelectTrigger>
+          <SelectContent><SelectItem value="1">Burkina Faso</SelectItem><SelectItem value="2">Côte d’Ivoire</SelectItem></SelectContent>
+        </Select>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -298,6 +306,14 @@ const AdminProducts = () => {
                       </SelectItem>
                     ))}
                   </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Pays de publication</Label>
+                <Select value={String(formData.countryId || countryId)} onValueChange={(value) => setFormData({ ...formData, countryId: Number(value) })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="1">Burkina Faso</SelectItem><SelectItem value="2">Côte d’Ivoire</SelectItem></SelectContent>
                 </Select>
               </div>
               

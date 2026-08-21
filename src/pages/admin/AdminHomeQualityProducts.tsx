@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, Package, Pencil, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Product } from "@/hooks/useProducts";
@@ -102,12 +103,9 @@ export default function AdminHomeQualityProducts() {
           <h1 className="text-3xl font-bold">Nos produits de qualité</h1>
           <p className="mt-1 text-muted-foreground">Choisissez et modifiez les produits présentés sur la page d'accueil.</p>
         </div>
-        <div className="w-full sm:w-64">
-          <Label>Pays à administrer</Label>
-          <Select value={countryId} onValueChange={setCountryId}>
-            <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-            <SelectContent>{COUNTRIES.map((country) => <SelectItem key={country.id} value={String(country.id)}>{country.name}</SelectItem>)}</SelectContent>
-          </Select>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
+          <div className="w-full sm:w-64"><Label>Pays à administrer</Label><Select value={countryId} onValueChange={setCountryId}><SelectTrigger className="mt-2"><SelectValue /></SelectTrigger><SelectContent>{COUNTRIES.map((country) => <SelectItem key={country.id} value={String(country.id)}>{country.name}</SelectItem>)}</SelectContent></Select></div>
+          <Button asChild><Link to="/admin/produits">Ajouter un produit</Link></Button>
         </div>
       </div>
 

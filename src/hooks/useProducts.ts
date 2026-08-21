@@ -33,6 +33,7 @@ export interface ProductFormData {
   description: string;
   inStock: boolean;
   stockQuantity: string;
+  countryId?: number;
   isLiquidation?: boolean;
   liquidationPrice?: string;
   liquidationUntil?: string;
@@ -40,13 +41,13 @@ export interface ProductFormData {
 
 const getSelectedCountry = () => Number(localStorage.getItem("country_id")) || 1;
 
-export const useProducts = () => {
+export const useProducts = (countryId?: number) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const fetchProducts = async () => {
-    const selectedCountry = getSelectedCountry();
+    const selectedCountry = countryId ?? getSelectedCountry();
     setIsLoading(true);
     const result: any = await supabase
       .from("products" as any)
@@ -80,11 +81,11 @@ export const useProducts = () => {
 
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [countryId]);
 
   const createProduct = async (formData: ProductFormData, imageUrl: string | null) => {
     const stockQty = Number(formData.stockQuantity) || 0;
-    const selectedCountry = getSelectedCountry();
+    const selectedCountry = formData.countryId ?? countryId ?? getSelectedCountry();
     const { data, error }: any = await supabase
       .from('products' as any)
       .insert({
@@ -128,6 +129,7 @@ export const useProducts = () => {
       description: formData.description || null,
       in_stock: formData.inStock,
       stock_quantity: stockQty,
+      country_id: formData.countryId ?? countryId ?? getSelectedCountry(),
       ...extraData,
     };
 
@@ -152,16 +154,19 @@ setProducts(prev => prev.map(p => p.id === id ? data : p));
   };
 
   const deleteProduct = async (id: string) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('products') 
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       console.error('Error deleting product:', error);
       throw error;
     }
 
+    if (!data) throw new Error("Le produit n'a pas été supprimé. Vérifiez vos droits administrateur.");
     setProducts(prev => prev.filter(p => p.id !== id));
   };
 
