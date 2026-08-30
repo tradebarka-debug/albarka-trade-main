@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useOrganizationPortal, Warehouse, OrganizationProduct, MenuItem } from "@/hooks/useOrganizationPortal";
+import { useOrganizationPortal, Warehouse, OrganizationProduct, MenuItem, Truck } from "@/hooks/useOrganizationPortal";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Store, Package, Users, LogOut, ImageIcon, X, UtensilsCrossed, ClipboardList, Wallet, TrendingUp, LocateFixed, MapPin, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Loader2, Plus, Store, Package, Users, LogOut, ImageIcon, X, UtensilsCrossed, ClipboardList, Wallet, TrendingUp, LocateFixed, MapPin, Eye, EyeOff, KeyRound, Truck as TruckIcon } from "lucide-react";
 
 const emptyWarehouseForm = { id: null as number | null, name: "", address: "", latitude: "", longitude: "" };
 const emptyProductForm = { id: null as number | null, name: "", description: "", category: "", price: "", unit: "", image: "" };
@@ -20,6 +20,25 @@ const emptyRestaurantForm = { name: "", description: "", location: "", hours: ""
 const emptyMenuItemForm = { id: null as string | null, name: "", description: "", price: "", image_url: "", is_available: true };
 const emptyEmployeeForm = { full_name: "", email: "", telephone: "", password: "", organization_role_id: "", restaurant_outlet_id: "" };
 const emptyOutletForm = { id: null as number | null, name: "", neighborhood: "", address: "", telephone: "", is_active: true };
+const emptyTruckForm = {
+  id: null as number | null,
+  title: "", vehicle_type: "", brand: "", model: "", year_built: "",
+  registration_number: "", registration_country: "", registration_city: "", condition: "", availability_status: "available",
+  axle_count: "", wheel_count: "", fuel_type: "", transmission_type: "", engine_power: "", mileage_km: "",
+  payload_tons: "", max_weight_kg: "", length_m: "", width_m: "", height_m: "", loading_volume_m3: "",
+  suspension_type: "", has_air_conditioning: false, has_gps: false, tire_condition: "",
+  last_service_date: "", next_inspection_date: "",
+  rental_with_driver: false, daily_rate: "", weekly_rate: "", monthly_rate: "", km_rate: "", security_deposit: "",
+  available_from: "", available_until: "",
+  has_registration_certificate: false, has_insurance: false, has_inspection_certificate: false, has_tax_sticker: false,
+  has_driver_license: false, has_transport_authorization: false, has_customs_document: false,
+  image_urls: ["", "", "", ""] as string[],
+  actif: true,
+};
+
+const truckAvailabilityLabel: Record<string, string> = {
+  available: "Disponible", reserved: "Réservé", on_mission: "En mission", maintenance: "Maintenance", disabled: "Hors service",
+};
 
 async function uploadProductImage(file: File) {
   const extension = file.name.split(".").pop() || "png";
@@ -34,6 +53,15 @@ async function uploadMenuOrRestaurantImage(file: File, folder: "menu-items" | "r
   const extension = file.name.split(".").pop() || "png";
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const path = `${folder}/${uniqueName}.${extension}`;
+  const { error } = await supabase.storage.from("organization-products").upload(path, file, { contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("organization-products").getPublicUrl(path).data.publicUrl;
+}
+
+async function uploadTruckImage(file: File) {
+  const extension = file.name.split(".").pop() || "png";
+  const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const path = `trucks/${uniqueName}.${extension}`;
   const { error } = await supabase.storage.from("organization-products").upload(path, file, { contentType: file.type });
   if (error) throw error;
   return supabase.storage.from("organization-products").getPublicUrl(path).data.publicUrl;
@@ -70,6 +98,12 @@ export default function OrganisationDashboard() {
   const [showEmployeePassword, setShowEmployeePassword] = useState(false);
   const [outletDialogOpen, setOutletDialogOpen] = useState(false);
   const [outletForm, setOutletForm] = useState(emptyOutletForm);
+  const [truckDialogOpen, setTruckDialogOpen] = useState(false);
+  const [truckDetailOpen, setTruckDetailOpen] = useState(false);
+  const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
+  const [truckForm, setTruckForm] = useState(emptyTruckForm);
+  const [truckImageFiles, setTruckImageFiles] = useState<(File | null)[]>([null, null, null, null]);
+  const [truckImagePreviews, setTruckImagePreviews] = useState<(string | null)[]>([null, null, null, null]);
 
   if (authLoading || loading) {
     return (
@@ -100,7 +134,7 @@ export default function OrganisationDashboard() {
 
   if (!data) return null;
 
-  const { organization, warehouses, products, employees, roles = [], outlets = [], stock, performance, restaurant, menuItems, restaurantOrders = [], cashSessions = [], financialEntries = [], isPdg, roleCode, capabilities } = data;
+  const { organization, warehouses, products, employees, roles = [], outlets = [], stock, performance, restaurant, menuItems, restaurantOrders = [], cashSessions = [], financialEntries = [], isPdg, roleCode, capabilities, trucks = [] } = data;
   const isRestaurant = (organization as any)?.organization_type === "restaurant";
   const openCashSession = cashSessions.find((session) => session.status === "open");
   const totalIncome = financialEntries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
@@ -493,6 +527,168 @@ export default function OrganisationDashboard() {
     } catch (e: any) { toast({ title: "Erreur", description: e.message, variant: "destructive" }); }
   };
 
+  const openTruckDialog = (truck?: Truck) => {
+    setTruckForm(
+      truck
+        ? {
+            id: truck.id,
+            title: truck.title,
+            vehicle_type: truck.vehicle_type ?? "",
+            brand: truck.brand ?? "",
+            model: truck.model ?? "",
+            year_built: truck.year_built?.toString() ?? "",
+            registration_number: truck.registration_number ?? "",
+            registration_country: truck.registration_country ?? "",
+            registration_city: truck.registration_city ?? "",
+            condition: truck.condition ?? "",
+            availability_status: truck.availability_status ?? "available",
+            axle_count: truck.axle_count?.toString() ?? "",
+            wheel_count: truck.wheel_count?.toString() ?? "",
+            fuel_type: truck.fuel_type ?? "",
+            transmission_type: truck.transmission_type ?? "",
+            engine_power: truck.engine_power ?? "",
+            mileage_km: truck.mileage_km?.toString() ?? "",
+            payload_tons: truck.payload_tons?.toString() ?? "",
+            max_weight_kg: truck.max_weight_kg?.toString() ?? "",
+            length_m: truck.length_m?.toString() ?? "",
+            width_m: truck.width_m?.toString() ?? "",
+            height_m: truck.height_m?.toString() ?? "",
+            loading_volume_m3: truck.loading_volume_m3?.toString() ?? "",
+            suspension_type: truck.suspension_type ?? "",
+            has_air_conditioning: truck.has_air_conditioning ?? false,
+            has_gps: truck.has_gps ?? false,
+            tire_condition: truck.tire_condition ?? "",
+            last_service_date: truck.last_service_date ?? "",
+            next_inspection_date: truck.next_inspection_date ?? "",
+            rental_with_driver: truck.rental_with_driver ?? false,
+            daily_rate: truck.daily_rate?.toString() ?? "",
+            weekly_rate: truck.weekly_rate?.toString() ?? "",
+            monthly_rate: truck.monthly_rate?.toString() ?? "",
+            km_rate: truck.km_rate?.toString() ?? "",
+            security_deposit: truck.security_deposit?.toString() ?? "",
+            available_from: truck.available_from ?? "",
+            available_until: truck.available_until ?? "",
+            has_registration_certificate: truck.has_registration_certificate ?? false,
+            has_insurance: truck.has_insurance ?? false,
+            has_inspection_certificate: truck.has_inspection_certificate ?? false,
+            has_tax_sticker: truck.has_tax_sticker ?? false,
+            has_driver_license: truck.has_driver_license ?? false,
+            has_transport_authorization: truck.has_transport_authorization ?? false,
+            has_customs_document: truck.has_customs_document ?? false,
+            image_urls: [0, 1, 2, 3].map((i) => truck.image_urls?.[i] ?? ""),
+            actif: truck.actif ?? true,
+          }
+        : emptyTruckForm
+    );
+    const existingImages = truck?.image_urls ?? [];
+    setTruckImageFiles([null, null, null, null]);
+    setTruckImagePreviews([0, 1, 2, 3].map((i) => existingImages[i] ?? null));
+    setTruckDialogOpen(true);
+  };
+
+  const openTruckDetail = (truck: Truck) => {
+    setSelectedTruck(truck);
+    setTruckDetailOpen(true);
+  };
+
+  const selectTruckImage = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      toast({ title: "Erreur", description: "Choisissez une image JPG, PNG ou WebP de 5 Mo maximum", variant: "destructive" });
+      event.target.value = "";
+      return;
+    }
+    setTruckImageFiles((files) => files.map((f, i) => (i === index ? file : f)));
+    setTruckImagePreviews((previews) => previews.map((p, i) => (i === index ? URL.createObjectURL(file) : p)));
+  };
+
+  const removeTruckImage = (index: number) => {
+    setTruckImageFiles((files) => files.map((f, i) => (i === index ? null : f)));
+    setTruckImagePreviews((previews) => previews.map((p, i) => (i === index ? null : p)));
+    setTruckForm((form) => ({ ...form, image_urls: form.image_urls.map((url, i) => (i === index ? "" : url)) }));
+  };
+
+  const submitTruck = async () => {
+    if (!truckForm.title.trim()) {
+      toast({ title: "Erreur", description: "Le nom/titre de l'annonce est obligatoire", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const uploadedUrls = await Promise.all(
+        truckImageFiles.map((file, i) => (file ? uploadTruckImage(file) : Promise.resolve(truckForm.image_urls[i] ?? null)))
+      );
+      const image_urls = uploadedUrls.filter((url): url is string => Boolean(url));
+      await callAction("upsert_truck", {
+        id: truckForm.id,
+        title: truckForm.title,
+        vehicle_type: truckForm.vehicle_type || null,
+        brand: truckForm.brand || null,
+        model: truckForm.model || null,
+        year_built: truckForm.year_built ? Number(truckForm.year_built) : null,
+        registration_number: truckForm.registration_number || null,
+        registration_country: truckForm.registration_country || null,
+        registration_city: truckForm.registration_city || null,
+        condition: truckForm.condition || null,
+        availability_status: truckForm.availability_status,
+        axle_count: truckForm.axle_count ? Number(truckForm.axle_count) : null,
+        wheel_count: truckForm.wheel_count ? Number(truckForm.wheel_count) : null,
+        fuel_type: truckForm.fuel_type || null,
+        transmission_type: truckForm.transmission_type || null,
+        engine_power: truckForm.engine_power || null,
+        mileage_km: truckForm.mileage_km ? Number(truckForm.mileage_km) : null,
+        payload_tons: truckForm.payload_tons ? Number(truckForm.payload_tons) : null,
+        max_weight_kg: truckForm.max_weight_kg ? Number(truckForm.max_weight_kg) : null,
+        length_m: truckForm.length_m ? Number(truckForm.length_m) : null,
+        width_m: truckForm.width_m ? Number(truckForm.width_m) : null,
+        height_m: truckForm.height_m ? Number(truckForm.height_m) : null,
+        loading_volume_m3: truckForm.loading_volume_m3 ? Number(truckForm.loading_volume_m3) : null,
+        suspension_type: truckForm.suspension_type || null,
+        has_air_conditioning: truckForm.has_air_conditioning,
+        has_gps: truckForm.has_gps,
+        tire_condition: truckForm.tire_condition || null,
+        last_service_date: truckForm.last_service_date || null,
+        next_inspection_date: truckForm.next_inspection_date || null,
+        rental_with_driver: truckForm.rental_with_driver,
+        daily_rate: truckForm.daily_rate ? Number(truckForm.daily_rate) : null,
+        weekly_rate: truckForm.weekly_rate ? Number(truckForm.weekly_rate) : null,
+        monthly_rate: truckForm.monthly_rate ? Number(truckForm.monthly_rate) : null,
+        km_rate: truckForm.km_rate ? Number(truckForm.km_rate) : null,
+        security_deposit: truckForm.security_deposit ? Number(truckForm.security_deposit) : null,
+        available_from: truckForm.available_from || null,
+        available_until: truckForm.available_until || null,
+        has_registration_certificate: truckForm.has_registration_certificate,
+        has_insurance: truckForm.has_insurance,
+        has_inspection_certificate: truckForm.has_inspection_certificate,
+        has_tax_sticker: truckForm.has_tax_sticker,
+        has_driver_license: truckForm.has_driver_license,
+        has_transport_authorization: truckForm.has_transport_authorization,
+        has_customs_document: truckForm.has_customs_document,
+        image_urls,
+        actif: truckForm.actif,
+      });
+      toast({ title: "Camion enregistré" });
+      setTruckDialogOpen(false);
+      await refetch();
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deleteTruck = async (id: number) => {
+    try {
+      await callAction("delete_truck", { id });
+      toast({ title: "Camion supprimé" });
+      setTruckDetailOpen(false);
+      await refetch();
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen min-w-0 space-y-6 overflow-x-hidden bg-muted/30 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -546,6 +742,15 @@ export default function OrganisationDashboard() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-6 flex items-center gap-4">
+            <TruckIcon className="h-8 w-8 text-primary" />
+            <div>
+              <p className="text-sm text-muted-foreground">Camions</p>
+              <p className="text-2xl font-bold">{trucks.length}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue={isRestaurant ? "restaurant" : "magasins"} className="min-w-0">
@@ -564,6 +769,7 @@ export default function OrganisationDashboard() {
               <TabsTrigger value="produits">Produits &amp; Stock</TabsTrigger>
             </>
           )}
+          <TabsTrigger value="logistique">Logistique</TabsTrigger>
           {isPdg && isRestaurant && <TabsTrigger value="points-vente">Points de vente</TabsTrigger>}
           {isPdg && <TabsTrigger value="employes">Employés &amp; Performance</TabsTrigger>}
         </TabsList>
@@ -873,6 +1079,53 @@ export default function OrganisationDashboard() {
         </>
         )}
 
+        <TabsContent value="logistique" className="space-y-4">
+          {capabilities.manageLogistics && (
+            <div className="flex justify-end">
+              <Button onClick={() => openTruckDialog()}>
+                <Plus className="h-4 w-4 mr-2" /> Ajouter un camion
+              </Button>
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {trucks.map((truck) => (
+              <Card
+                key={truck.id}
+                className="cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
+                onClick={() => openTruckDetail(truck)}
+              >
+                <div className="grid grid-cols-2 gap-0.5 bg-muted">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="aspect-square overflow-hidden bg-muted">
+                      {truck.image_urls[i] ? (
+                        <img src={truck.image_urls[i]} alt={`${truck.title} ${i + 1}`} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <ImageIcon className="h-5 w-5" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <CardContent className="space-y-1 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-medium">{truck.title}</p>
+                    <Badge variant={truck.availability_status === "available" ? "default" : "secondary"}>
+                      {truckAvailabilityLabel[truck.availability_status] || truck.availability_status}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {truck.vehicle_type || "Type non renseigné"}{truck.brand ? ` — ${truck.brand}` : ""}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+            {trucks.length === 0 && (
+              <p className="col-span-full py-8 text-center text-muted-foreground">Aucun camion enregistré</p>
+            )}
+          </div>
+        </TabsContent>
+
         {isPdg && isRestaurant && (
           <TabsContent value="points-vente" className="space-y-4">
             <div className="flex items-center justify-between gap-4"><div><h2 className="text-xl font-semibold">Points de vente</h2><p className="text-sm text-muted-foreground">Une équipe et un suivi séparés pour chaque quartier.</p></div><Button onClick={() => { setOutletForm(emptyOutletForm); setOutletDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" />Ajouter</Button></div>
@@ -1115,6 +1368,293 @@ export default function OrganisationDashboard() {
           </div>
           <DialogFooter>
             <Button onClick={() => void submitMenuItem()} disabled={submitting}>
+              {submitting ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={truckDetailOpen} onOpenChange={setTruckDetailOpen}>
+        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto">
+          {selectedTruck && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center justify-between gap-2 pr-6">
+                  <span>{selectedTruck.title}</span>
+                  <Badge variant={selectedTruck.availability_status === "available" ? "default" : "secondary"}>
+                    {truckAvailabilityLabel[selectedTruck.availability_status] || selectedTruck.availability_status}
+                  </Badge>
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="aspect-square overflow-hidden rounded-md border bg-muted">
+                      {selectedTruck.image_urls[i] ? (
+                        <img src={selectedTruck.image_urls[i]} alt={`${selectedTruck.title} ${i + 1}`} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <ImageIcon className="h-5 w-5" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Informations générales</h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <p><span className="text-muted-foreground">Type : </span>{selectedTruck.vehicle_type || "—"}</p>
+                    <p><span className="text-muted-foreground">Marque : </span>{selectedTruck.brand || "—"}</p>
+                    <p><span className="text-muted-foreground">Modèle : </span>{selectedTruck.model || "—"}</p>
+                    <p><span className="text-muted-foreground">Année : </span>{selectedTruck.year_built || "—"}</p>
+                    <p><span className="text-muted-foreground">Immatriculation : </span>{selectedTruck.registration_number || "—"}</p>
+                    <p><span className="text-muted-foreground">Pays / Ville : </span>{[selectedTruck.registration_country, selectedTruck.registration_city].filter(Boolean).join(" / ") || "—"}</p>
+                    <p><span className="text-muted-foreground">État : </span>{selectedTruck.condition || "—"}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Caractéristiques techniques</h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <p><span className="text-muted-foreground">Essieux : </span>{selectedTruck.axle_count ?? "—"}</p>
+                    <p><span className="text-muted-foreground">Roues : </span>{selectedTruck.wheel_count ?? "—"}</p>
+                    <p><span className="text-muted-foreground">Carburant : </span>{selectedTruck.fuel_type || "—"}</p>
+                    <p><span className="text-muted-foreground">Transmission : </span>{selectedTruck.transmission_type || "—"}</p>
+                    <p><span className="text-muted-foreground">Puissance moteur : </span>{selectedTruck.engine_power || "—"}</p>
+                    <p><span className="text-muted-foreground">Kilométrage : </span>{selectedTruck.mileage_km ?? "—"} km</p>
+                    <p><span className="text-muted-foreground">Charge utile : </span>{selectedTruck.payload_tons ?? "—"} t</p>
+                    <p><span className="text-muted-foreground">PTAC : </span>{selectedTruck.max_weight_kg ?? "—"} kg</p>
+                    <p><span className="text-muted-foreground">Dimensions (L×l×H) : </span>{[selectedTruck.length_m, selectedTruck.width_m, selectedTruck.height_m].map((v) => v ?? "—").join(" × ")} m</p>
+                    <p><span className="text-muted-foreground">Volume utile : </span>{selectedTruck.loading_volume_m3 ?? "—"} m³</p>
+                    <p><span className="text-muted-foreground">Suspension : </span>{selectedTruck.suspension_type || "—"}</p>
+                    <p><span className="text-muted-foreground">Climatisation : </span>{selectedTruck.has_air_conditioning ? "Oui" : "Non"}</p>
+                    <p><span className="text-muted-foreground">GPS : </span>{selectedTruck.has_gps ? "Oui" : "Non"}</p>
+                    <p><span className="text-muted-foreground">État des pneus : </span>{selectedTruck.tire_condition || "—"}</p>
+                    <p><span className="text-muted-foreground">Dernier entretien : </span>{selectedTruck.last_service_date || "—"}</p>
+                    <p><span className="text-muted-foreground">Prochain contrôle technique : </span>{selectedTruck.next_inspection_date || "—"}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Conditions de location</h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <p><span className="text-muted-foreground">Avec chauffeur : </span>{selectedTruck.rental_with_driver ? "Oui" : "Non"}</p>
+                    <p><span className="text-muted-foreground">Tarif journalier : </span>{selectedTruck.daily_rate ?? "—"}</p>
+                    <p><span className="text-muted-foreground">Tarif hebdomadaire : </span>{selectedTruck.weekly_rate ?? "—"}</p>
+                    <p><span className="text-muted-foreground">Tarif mensuel : </span>{selectedTruck.monthly_rate ?? "—"}</p>
+                    <p><span className="text-muted-foreground">Tarif au km : </span>{selectedTruck.km_rate ?? "—"}</p>
+                    <p><span className="text-muted-foreground">Caution : </span>{selectedTruck.security_deposit ?? "—"}</p>
+                    <p><span className="text-muted-foreground">Disponible du : </span>{selectedTruck.available_from || "—"}</p>
+                    <p><span className="text-muted-foreground">Disponible jusqu'au : </span>{selectedTruck.available_until || "—"}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Documents requis</h3>
+                  <div className="grid grid-cols-2 gap-1 text-sm">
+                    <p>{selectedTruck.has_registration_certificate ? "✓" : "✗"} Carte grise</p>
+                    <p>{selectedTruck.has_insurance ? "✓" : "✗"} Assurance</p>
+                    <p>{selectedTruck.has_inspection_certificate ? "✓" : "✗"} Contrôle technique</p>
+                    <p>{selectedTruck.has_tax_sticker ? "✓" : "✗"} Vignette</p>
+                    <p>{selectedTruck.has_driver_license ? "✓" : "✗"} Permis de conduire</p>
+                    <p>{selectedTruck.has_transport_authorization ? "✓" : "✗"} Autorisation de transport</p>
+                    <p>{selectedTruck.has_customs_document ? "✓" : "✗"} Document douanier</p>
+                  </div>
+                </div>
+              </div>
+              {capabilities.manageLogistics && (
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => { setTruckDetailOpen(false); openTruckDialog(selectedTruck); }}>Modifier</Button>
+                  <Button variant="destructive" onClick={() => void deleteTruck(selectedTruck.id)}>Supprimer</Button>
+                </DialogFooter>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={truckDialogOpen} onOpenChange={setTruckDialogOpen}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>{truckForm.id ? "Modifier le camion" : "Ajouter un camion"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div>
+              <Label>Photos (4 emplacements)</Label>
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i}>
+                    {truckImagePreviews[i] ? (
+                      <div className="relative aspect-square">
+                        <img src={truckImagePreviews[i]!} alt={`Photo ${i + 1}`} className="h-full w-full rounded-lg border object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeTruckImage(i)}
+                          className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed hover:bg-muted/50">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        <span className="mt-1 text-xs text-muted-foreground">Photo {i + 1}</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => selectTruckImage(i, e)} />
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold text-muted-foreground">Informations générales</h3>
+              <div>
+                <Label>Nom / titre de l'annonce</Label>
+                <Input value={truckForm.title} onChange={(e) => setTruckForm({ ...truckForm, title: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Type de véhicule</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={truckForm.vehicle_type} onChange={(e) => setTruckForm({ ...truckForm, vehicle_type: e.target.value })}>
+                    <option value="">Sélectionner</option>
+                    <option value="semi_remorque">Camion semi-remorque</option>
+                    <option value="tracteur_routier">Tracteur routier</option>
+                    <option value="remorque">Semi-remorque</option>
+                    <option value="plateau">Camion plateau</option>
+                    <option value="benne">Benne</option>
+                    <option value="citerne">Citerne</option>
+                    <option value="frigorifique">Véhicule frigorifique</option>
+                    <option value="porte_conteneur">Porte-conteneur</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>État</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={truckForm.condition} onChange={(e) => setTruckForm({ ...truckForm, condition: e.target.value })}>
+                    <option value="">Sélectionner</option>
+                    <option value="neuf">Neuf</option>
+                    <option value="tres_bon_etat">Très bon état</option>
+                    <option value="bon_etat">Bon état</option>
+                    <option value="etat_moyen">État moyen</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Marque</Label><Input value={truckForm.brand} onChange={(e) => setTruckForm({ ...truckForm, brand: e.target.value })} /></div>
+                <div><Label>Modèle</Label><Input value={truckForm.model} onChange={(e) => setTruckForm({ ...truckForm, model: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Année de fabrication</Label><Input type="number" value={truckForm.year_built} onChange={(e) => setTruckForm({ ...truckForm, year_built: e.target.value })} /></div>
+                <div>
+                  <Label>Disponibilité</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={truckForm.availability_status} onChange={(e) => setTruckForm({ ...truckForm, availability_status: e.target.value })}>
+                    <option value="available">Disponible</option>
+                    <option value="reserved">Réservé</option>
+                    <option value="on_mission">En mission</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="disabled">Hors service</option>
+                  </select>
+                </div>
+              </div>
+              <div><Label>Numéro d'immatriculation</Label><Input value={truckForm.registration_number} onChange={(e) => setTruckForm({ ...truckForm, registration_number: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Pays d'immatriculation</Label><Input value={truckForm.registration_country} onChange={(e) => setTruckForm({ ...truckForm, registration_country: e.target.value })} /></div>
+                <div><Label>Ville d'immatriculation</Label><Input value={truckForm.registration_city} onChange={(e) => setTruckForm({ ...truckForm, registration_city: e.target.value })} /></div>
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold text-muted-foreground">Caractéristiques techniques</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Nombre d'essieux</Label><Input type="number" value={truckForm.axle_count} onChange={(e) => setTruckForm({ ...truckForm, axle_count: e.target.value })} /></div>
+                <div><Label>Nombre de roues</Label><Input type="number" value={truckForm.wheel_count} onChange={(e) => setTruckForm({ ...truckForm, wheel_count: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Type de carburant</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={truckForm.fuel_type} onChange={(e) => setTruckForm({ ...truckForm, fuel_type: e.target.value })}>
+                    <option value="">Sélectionner</option>
+                    <option value="diesel">Diesel</option>
+                    <option value="essence">Essence</option>
+                    <option value="gaz">Gaz (GPL/GNV)</option>
+                    <option value="electrique">Électrique</option>
+                    <option value="hybride">Hybride</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Type de transmission</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={truckForm.transmission_type} onChange={(e) => setTruckForm({ ...truckForm, transmission_type: e.target.value })}>
+                    <option value="">Sélectionner</option>
+                    <option value="manuelle">Manuelle</option>
+                    <option value="automatique">Automatique</option>
+                    <option value="semi_automatique">Semi-automatique</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Puissance moteur</Label><Input value={truckForm.engine_power} onChange={(e) => setTruckForm({ ...truckForm, engine_power: e.target.value })} placeholder="Ex. 420 ch" /></div>
+                <div><Label>Kilométrage</Label><Input type="number" value={truckForm.mileage_km} onChange={(e) => setTruckForm({ ...truckForm, mileage_km: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Charge utile (tonnes)</Label><Input type="number" value={truckForm.payload_tons} onChange={(e) => setTruckForm({ ...truckForm, payload_tons: e.target.value })} /></div>
+                <div><Label>Poids total autorisé (kg)</Label><Input type="number" value={truckForm.max_weight_kg} onChange={(e) => setTruckForm({ ...truckForm, max_weight_kg: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div><Label>Longueur (m)</Label><Input type="number" value={truckForm.length_m} onChange={(e) => setTruckForm({ ...truckForm, length_m: e.target.value })} /></div>
+                <div><Label>Largeur (m)</Label><Input type="number" value={truckForm.width_m} onChange={(e) => setTruckForm({ ...truckForm, width_m: e.target.value })} /></div>
+                <div><Label>Hauteur (m)</Label><Input type="number" value={truckForm.height_m} onChange={(e) => setTruckForm({ ...truckForm, height_m: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Volume de chargement (m³)</Label><Input type="number" value={truckForm.loading_volume_m3} onChange={(e) => setTruckForm({ ...truckForm, loading_volume_m3: e.target.value })} /></div>
+                <div><Label>Type de suspension</Label><Input value={truckForm.suspension_type} onChange={(e) => setTruckForm({ ...truckForm, suspension_type: e.target.value })} /></div>
+              </div>
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-2"><input type="checkbox" id="truck-ac" checked={truckForm.has_air_conditioning} onChange={(e) => setTruckForm({ ...truckForm, has_air_conditioning: e.target.checked })} /><Label htmlFor="truck-ac">Climatisation</Label></div>
+                <div className="flex items-center gap-2"><input type="checkbox" id="truck-gps" checked={truckForm.has_gps} onChange={(e) => setTruckForm({ ...truckForm, has_gps: e.target.checked })} /><Label htmlFor="truck-gps">GPS / géolocalisation</Label></div>
+              </div>
+              <div><Label>État des pneus</Label><Input value={truckForm.tire_condition} onChange={(e) => setTruckForm({ ...truckForm, tire_condition: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Date du dernier entretien</Label><Input type="date" value={truckForm.last_service_date} onChange={(e) => setTruckForm({ ...truckForm, last_service_date: e.target.value })} /></div>
+                <div><Label>Date du prochain contrôle technique</Label><Input type="date" value={truckForm.next_inspection_date} onChange={(e) => setTruckForm({ ...truckForm, next_inspection_date: e.target.value })} /></div>
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold text-muted-foreground">Conditions de location</h3>
+              <div className="flex items-center gap-2"><input type="checkbox" id="truck-driver" checked={truckForm.rental_with_driver} onChange={(e) => setTruckForm({ ...truckForm, rental_with_driver: e.target.checked })} /><Label htmlFor="truck-driver">Location avec chauffeur</Label></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Tarif journalier</Label><Input type="number" value={truckForm.daily_rate} onChange={(e) => setTruckForm({ ...truckForm, daily_rate: e.target.value })} /></div>
+                <div><Label>Tarif hebdomadaire</Label><Input type="number" value={truckForm.weekly_rate} onChange={(e) => setTruckForm({ ...truckForm, weekly_rate: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Tarif mensuel</Label><Input type="number" value={truckForm.monthly_rate} onChange={(e) => setTruckForm({ ...truckForm, monthly_rate: e.target.value })} /></div>
+                <div><Label>Tarif au kilomètre</Label><Input type="number" value={truckForm.km_rate} onChange={(e) => setTruckForm({ ...truckForm, km_rate: e.target.value })} /></div>
+              </div>
+              <div><Label>Montant de la caution</Label><Input type="number" value={truckForm.security_deposit} onChange={(e) => setTruckForm({ ...truckForm, security_deposit: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Date de début de disponibilité</Label><Input type="date" value={truckForm.available_from} onChange={(e) => setTruckForm({ ...truckForm, available_from: e.target.value })} /></div>
+                <div><Label>Date de fin de disponibilité</Label><Input type="date" value={truckForm.available_until} onChange={(e) => setTruckForm({ ...truckForm, available_until: e.target.value })} /></div>
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold text-muted-foreground">Documents requis</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2"><input type="checkbox" id="doc-carte-grise" checked={truckForm.has_registration_certificate} onChange={(e) => setTruckForm({ ...truckForm, has_registration_certificate: e.target.checked })} /><Label htmlFor="doc-carte-grise">Carte grise</Label></div>
+                <div className="flex items-center gap-2"><input type="checkbox" id="doc-assurance" checked={truckForm.has_insurance} onChange={(e) => setTruckForm({ ...truckForm, has_insurance: e.target.checked })} /><Label htmlFor="doc-assurance">Assurance</Label></div>
+                <div className="flex items-center gap-2"><input type="checkbox" id="doc-controle" checked={truckForm.has_inspection_certificate} onChange={(e) => setTruckForm({ ...truckForm, has_inspection_certificate: e.target.checked })} /><Label htmlFor="doc-controle">Contrôle technique</Label></div>
+                <div className="flex items-center gap-2"><input type="checkbox" id="doc-vignette" checked={truckForm.has_tax_sticker} onChange={(e) => setTruckForm({ ...truckForm, has_tax_sticker: e.target.checked })} /><Label htmlFor="doc-vignette">Vignette</Label></div>
+                <div className="flex items-center gap-2"><input type="checkbox" id="doc-permis" checked={truckForm.has_driver_license} onChange={(e) => setTruckForm({ ...truckForm, has_driver_license: e.target.checked })} /><Label htmlFor="doc-permis">Permis de conduire</Label></div>
+                <div className="flex items-center gap-2"><input type="checkbox" id="doc-autorisation" checked={truckForm.has_transport_authorization} onChange={(e) => setTruckForm({ ...truckForm, has_transport_authorization: e.target.checked })} /><Label htmlFor="doc-autorisation">Autorisation de transport</Label></div>
+                <div className="flex items-center gap-2"><input type="checkbox" id="doc-douane" checked={truckForm.has_customs_document} onChange={(e) => setTruckForm({ ...truckForm, has_customs_document: e.target.checked })} /><Label htmlFor="doc-douane">Document douanier</Label></div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTruckDialogOpen(false)}>Annuler</Button>
+            <Button onClick={() => void submitTruck()} disabled={submitting}>
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {submitting ? "Enregistrement..." : "Enregistrer"}
             </Button>
           </DialogFooter>
