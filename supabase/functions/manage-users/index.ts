@@ -356,6 +356,10 @@ Deno.serve(async (req) => {
     };
 
     const isGlobalManager = isSystemAdmin || isManagementRole;
+    const isMarketingDirector =
+      requesterOrganizationType === "albarka_trade" &&
+      ["direction_marketing", "directeur_marketing"].includes(normalizedRoleCode);
+    const canReviewAccountDeletions = isGlobalManager;
     const isInRequesterScope = (organizationId: number | null, countryId: number | null) =>
       isGlobalManager || (
         Number(organizationId) === Number(requesterProfile.organization_id) &&
@@ -403,10 +407,158 @@ Deno.serve(async (req) => {
           is_management_role: isManagementRole,
           has_managed_roles: hasManagedRoles,
           is_internal_organization: requesterOrganizationType === "albarka_trade",
+          is_marketing_director: isMarketingDirector,
+          can_review_account_deletions: canReviewAccountDeletions,
         },
         200,
         corsHeaders
       );
+    }
+
+    if (action === "list_deletion_requests") {
+      if (!canReviewAccountDeletions && !isMarketingDirector) {
+        return jsonResponse({ error: "Permission insuffisante" }, 403, corsHeaders);
+      }
+
+      let requestQuery = supabaseAdmin
+        .from("account_deletion_requests")
+        .select("id, target_user_id, target_name, target_email, target_organization_id, country_id, requested_by, request_kind, reason, status, reviewed_by, reviewed_at, review_note, created_at")
+        .order("created_at", { ascending: false });
+      if (!canReviewAccountDeletions && requesterProfile.country_id) {
+        requestQuery = requestQuery.eq("country_id", requesterProfile.country_id);
+      }
+      const { data: requests, error: requestsError } = await requestQuery;
+      if (requestsError) throw requestsError;
+      return jsonResponse({ requests: requests || [] }, 200, corsHeaders);
+    }
+
+    if (action === "list_partner_accounts_for_deletion") {
+      if (!canReviewAccountDeletions && !isMarketingDirector) {
+        return jsonResponse({ error: "Permission insuffisante" }, 403, corsHeaders);
+      }
+      const { data: partnerOrganizations, error: partnerOrganizationsError } = await supabaseAdmin
+        .from("organizations")
+        .select("id, name, organization_type, country_id")
+        .neq("organization_type", "albarka_trade");
+      if (partnerOrganizationsError) throw partnerOrganizationsError;
+      const scopedOrganizations = (partnerOrganizations || []).filter((organization: any) =>
+        canReviewAccountDeletions || !requesterProfile.country_id || Number(organization.country_id) === Number(requesterProfile.country_id)
+      );
+      const organizationIds = scopedOrganizations.map((organization: any) => organization.id);
+      if (organizationIds.length === 0) return jsonResponse({ accounts: [] }, 200, corsHeaders);
+      const { data: partnerProfiles, error: partnerProfilesError } = await supabaseAdmin
+        .from("profiles")
+        .select("id, nom, email, telephone, organization_id, country_id, is_active")
+        .in("organization_id", organizationIds)
+        .order("nom");
+      if (partnerProfilesError) throw partnerProfilesError;
+      const organizationById = new Map(scopedOrganizations.map((organization: any) => [Number(organization.id), organization]));
+      return jsonResponse({
+        accounts: (partnerProfiles || []).map((profile: any) => ({
+          ...profile,
+          organization_name: organizationById.get(Number(profile.organization_id))?.name || null,
+        })),
+      }, 200, corsHeaders);
+    }
+
+    if (action === "request_deletion") {
+      const { userId, reason } = params;
+      const targetUserId = String(userId || currentUser.id);
+      const cleanReason = String(reason || "").trim();
+      if (cleanReason.length < 5 || cleanReason.length > 1000) {
+        return jsonResponse({ error: "Le motif doit contenir entre 5 et 1000 caractères" }, 400, corsHeaders);
+      }
+
+      const isSelfRequest = targetUserId === currentUser.id;
+      if (!isSelfRequest && !isMarketingDirector) {
+        return jsonResponse({ error: "Seul le Directeur marketing peut demander la suppression d'un compte partenaire" }, 403, corsHeaders);
+      }
+
+      const { data: targetProfile, error: targetError } = await supabaseAdmin
+        .from("profiles")
+        .select("id, nom, email, organization_id, country_id")
+        .eq("id", targetUserId)
+        .maybeSingle();
+      if (targetError) throw targetError;
+      if (!targetProfile) return jsonResponse({ error: "Compte introuvable" }, 404, corsHeaders);
+
+      let targetOrganizationType: string | null = null;
+      if (targetProfile.organization_id) {
+        const { data: targetOrganization } = await supabaseAdmin
+          .from("organizations")
+          .select("organization_type")
+          .eq("id", targetProfile.organization_id)
+          .maybeSingle();
+        targetOrganizationType = targetOrganization?.organization_type ?? null;
+      }
+      if (!isSelfRequest && targetOrganizationType === "albarka_trade") {
+        return jsonResponse({ error: "Le Directeur marketing ne peut demander que la suppression d'un compte partenaire" }, 403, corsHeaders);
+      }
+      if (!isSelfRequest && requesterProfile.country_id && Number(targetProfile.country_id) !== Number(requesterProfile.country_id)) {
+        return jsonResponse({ error: "Ce compte partenaire appartient à un autre pays" }, 403, corsHeaders);
+      }
+
+      const { error: insertRequestError } = await supabaseAdmin
+        .from("account_deletion_requests")
+        .insert({
+          target_user_id: targetProfile.id,
+          target_name: targetProfile.nom || targetProfile.email || "Compte utilisateur",
+          target_email: targetProfile.email,
+          target_organization_id: targetProfile.organization_id,
+          country_id: targetProfile.country_id,
+          requested_by: currentUser.id,
+          request_kind: isSelfRequest ? "self" : "partner",
+          reason: cleanReason,
+        });
+      if (insertRequestError) {
+        if (insertRequestError.code === "23505") {
+          return jsonResponse({ error: "Une demande est déjà en attente pour ce compte" }, 409, corsHeaders);
+        }
+        throw insertRequestError;
+      }
+      return jsonResponse({ success: true }, 200, corsHeaders);
+    }
+
+    if (action === "review_deletion_request") {
+      if (!canReviewAccountDeletions) {
+        return jsonResponse({ error: "Seul le PDG/Admin Albarka peut décider d'une suppression" }, 403, corsHeaders);
+      }
+      const { requestId, decision, reviewNote } = params;
+      if (!requestId || !["approve", "reject"].includes(String(decision))) {
+        return jsonResponse({ error: "Décision invalide" }, 400, corsHeaders);
+      }
+      const { data: deletionRequest, error: requestError } = await supabaseAdmin
+        .from("account_deletion_requests")
+        .select("id, target_user_id, status")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (requestError) throw requestError;
+      if (!deletionRequest || deletionRequest.status !== "pending") {
+        return jsonResponse({ error: "Cette demande n'est plus en attente" }, 409, corsHeaders);
+      }
+      if (decision === "reject") {
+        const { error: rejectError } = await supabaseAdmin.from("account_deletion_requests").update({
+          status: "rejected", reviewed_by: currentUser.id, reviewed_at: new Date().toISOString(),
+          review_note: String(reviewNote || "").trim() || null, updated_at: new Date().toISOString(),
+        }).eq("id", requestId);
+        if (rejectError) throw rejectError;
+        return jsonResponse({ success: true }, 200, corsHeaders);
+      }
+      if (!deletionRequest.target_user_id) {
+        return jsonResponse({ error: "Le compte a déjà été supprimé" }, 409, corsHeaders);
+      }
+      if (deletionRequest.target_user_id === currentUser.id) {
+        return jsonResponse({ error: "Vous ne pouvez pas approuver la suppression de votre propre compte" }, 400, corsHeaders);
+      }
+      const { error: approveError } = await supabaseAdmin.from("account_deletion_requests").update({
+        status: "approved", reviewed_by: currentUser.id, reviewed_at: new Date().toISOString(),
+        review_note: String(reviewNote || "").trim() || null, updated_at: new Date().toISOString(),
+      }).eq("id", requestId);
+      if (approveError) throw approveError;
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(deletionRequest.target_user_id);
+      if (authDeleteError) throw authDeleteError;
+      await supabaseAdmin.from("account_deletion_requests").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", requestId);
+      return jsonResponse({ success: true }, 200, corsHeaders);
     }
 
     if (action === "config") {
@@ -435,22 +587,22 @@ Deno.serve(async (req) => {
       const scopedOrganizations = canOpenPartnerAccount
         ? organizationsResult.data || []
         : (organizationsResult.data || []).filter(
-            (organization: any) =>
-              Number(organization.id) === Number(requesterProfile.organization_id)
-          );
+          (organization: any) =>
+            Number(organization.id) === Number(requesterProfile.organization_id)
+        );
       const scopedCountries = canOpenPartnerAccount
         ? countriesResult.data || []
         : (countriesResult.data || []).filter(
-            (country: any) =>
-              !requesterProfile.country_id ||
-              Number(country.id) === Number(requesterProfile.country_id)
-          );
+          (country: any) =>
+            !requesterProfile.country_id ||
+            Number(country.id) === Number(requesterProfile.country_id)
+        );
       const scopedRoles = canOpenPartnerAccount
         ? rolesResult.data || []
         : (rolesResult.data || []).filter(
-            (role: any) =>
-              Number(role.organization_id) === Number(requesterProfile.organization_id)
-          );
+          (role: any) =>
+            Number(role.organization_id) === Number(requesterProfile.organization_id)
+        );
 
       return jsonResponse(
         {
@@ -672,7 +824,7 @@ Deno.serve(async (req) => {
         !isSystemAdmin &&
         !canOpenPartnerAccount &&
         Number(organization_id) !==
-          Number(requesterProfile.organization_id)
+        Number(requesterProfile.organization_id)
       ) {
         return jsonResponse(
           { error: "Vous ne pouvez pas créer un compte dans cette organisation" },
@@ -750,7 +902,7 @@ Deno.serve(async (req) => {
         !isSystemAdmin &&
         requesterProfile.country_id &&
         Number(country_id) !==
-          Number(requesterProfile.country_id)
+        Number(requesterProfile.country_id)
       ) {
         return jsonResponse(
           { error: "Vous ne pouvez créer un compte que dans votre pays" },
@@ -874,7 +1026,7 @@ Deno.serve(async (req) => {
             email,
             telephone: normalizedTelephone,
             nom: full_name,
-            role: null,
+           role: isDriverRole ? "livreur" : null,
             organization_id,
             organization_role_id,
             manager_user_id:
@@ -888,12 +1040,34 @@ Deno.serve(async (req) => {
                 ? false
                 : true,
           });
-
+      const isDriverRole =
+        String(organizationRole.code || "").toLowerCase() === "livreur" ||
+        String(organizationRole.name || "").toLowerCase() === "livreur";
       if (profileError) {
         await supabaseAdmin.auth.admin.deleteUser(newUserId);
         throw profileError;
       }
+if (isDriverRole) {
+  const { error: driverError } = await supabaseAdmin
+    .from("drivers")
+    .upsert(
+      {
+        id: newUserId,
+        profile_id: newUserId,
+        nom: full_name,
+        telephone: normalizedTelephone,
+        email,
+        disponible: true,
+        statut: "Actif",
+      },
+      { onConflict: "id" }
+    );
 
+  if (driverError) {
+    await supabaseAdmin.auth.admin.deleteUser(newUserId);
+    throw driverError;
+  }
+}
       /*
        * Accès organisation / pays.
        */
@@ -1046,7 +1220,7 @@ Deno.serve(async (req) => {
         !isSystemAdmin &&
         !canApproveTarget &&
         Number(targetProfile.organization_id) !==
-          Number(requesterProfile.organization_id)
+        Number(requesterProfile.organization_id)
       ) {
         return jsonResponse(
           { error: "Accès interdit à cet utilisateur" },
@@ -1061,7 +1235,7 @@ Deno.serve(async (req) => {
         requesterProfile.country_id &&
         targetProfile.country_id &&
         Number(targetProfile.country_id) !==
-          Number(requesterProfile.country_id)
+        Number(requesterProfile.country_id)
       ) {
         return jsonResponse(
           { error: "Cet utilisateur appartient à un autre pays" },
@@ -1208,11 +1382,11 @@ Deno.serve(async (req) => {
      */
 
     if (action === "delete") {
-      if (!hasPermission("delete_users")) {
+      if (!canReviewAccountDeletions) {
         return jsonResponse(
           {
             error:
-              "Vous n'avez pas l'autorisation de supprimer un utilisateur",
+              "Seul le PDG/Admin Albarka peut supprimer directement un compte",
           },
           403,
           corsHeaders
@@ -1253,7 +1427,7 @@ Deno.serve(async (req) => {
         !isSystemAdmin &&
         targetProfile &&
         Number(targetProfile.organization_id) !==
-          Number(requesterProfile.organization_id)
+        Number(requesterProfile.organization_id)
       ) {
         return jsonResponse(
           { error: "Utilisateur hors de votre organisation" },

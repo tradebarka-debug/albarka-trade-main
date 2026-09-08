@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
       update_restaurant_order_status: "manageOrders",
       confirm_restaurant_order_payment: "managePayments",
       update_restaurant_delivery_status: "manageDelivery",
+      respond_restaurant_preorder: "manageOrders",
       open_cash_session: "manageCash", close_cash_session: "manageCash",
       record_financial_entry: "manageAccounting",
       create_organization_employee: "manageTeam",
@@ -196,7 +197,7 @@ Deno.serve(async (req) => {
 
           const { data: orderData, error: orderError } = await supabaseAdmin
             .from("orders")
-            .select("id, created_at, customer_name, telephone, total, payment_method, payment_status, payment_confirmed_at, transaction_ref, status, items, delivery_status, tracking_number, requires_delivery, restaurant_outlet_id")
+           .select("id, created_at, customer_name, telephone, address, total, payment_method, payment_status, payment_confirmed_at, transaction_ref, status, items, delivery_status, tracking_number, queue_number, requires_delivery, restaurant_outlet_id, restaurant_confirmation_status, restaurant_rejection_reason, payment_expires_at")
             .eq("restaurant_id", restaurant.id)
             .order("created_at", { ascending: false })
             .limit(200);
@@ -357,7 +358,36 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("organization_activity_events").insert({ organization_id: organizationId, restaurant_outlet_id: result.data.id, actor_user_id: currentUser.id, event_type: id ? "outlet_updated" : "outlet_created", entity_type: "restaurant_outlet", entity_id: String(result.data.id) });
       return jsonResponse({ success: true, outlet: result.data });
     }
+if (action === "respond_restaurant_preorder") {
+  const { order_id, accept, rejection_reason } = params as any;
 
+  if (!order_id || typeof accept !== "boolean") {
+    return jsonResponse(
+      { error: "Réponse de précommande invalide" },
+      400,
+      corsHeaders
+    );
+  }
+
+  const { data, error } = await supabaseUser.rpc(
+    "respond_restaurant_preorder",
+    {
+      p_order_id: order_id,
+      p_accept: accept,
+      p_rejection_reason: accept
+        ? null
+        : String(rejection_reason ?? "").trim(),
+    }
+  );
+
+  if (error) throw error;
+
+  return jsonResponse(
+    { success: true, result: data },
+    200,
+    corsHeaders
+  );
+}
     if (action === "confirm_restaurant_order_payment") {
       const { order_id, payment_status } = params as any;
       if (!["pending", "confirmed", "rejected"].includes(payment_status)) return jsonResponse({ error: "Statut de paiement invalide" }, 400, corsHeaders);

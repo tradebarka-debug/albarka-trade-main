@@ -123,8 +123,8 @@ const Auth = () => {
         description: errorMessage,
         variant: "destructive",
       });
-    } else {
-      toast({
+      } else {
+        toast({
         title: "Inscription réussie",
         description: "Votre compte a été créé avec succès !",
       });

@@ -67,8 +67,20 @@ const paymentMethods: PaymentMethodInfo[] = [
     ussd: "",
   },
 ];
-
+type DriverOption = {
+  driver_id: string;
+  driver_name: string;
+  is_available: boolean;
+  is_busy: boolean;
+  distance_to_restaurant_km: number;
+  restaurant_to_client_km: number;
+  total_distance_km: number;
+  estimated_minutes: number;
+};
 const Paiement = () => {
+  const [driverOptions, setDriverOptions] = useState<DriverOption[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>("");
+  const [driversLoading, setDriversLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { items, totalPrice, totalItems, clearCart } = useCart();
@@ -94,6 +106,10 @@ const Paiement = () => {
   const [manualLongitude, setManualLongitude] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [queueNumber, setQueueNumber] = useState<number | null>(null);
+  const [preorderId, setPreorderId] = useState<string | null>(null);
+  const [preorderStatus, setPreorderStatus] = useState<  "idle" | "pending" | "accepted" | "rejected" >("idle");
+  const [preorderLoading, setPreorderLoading] = useState(false);
+  const [preorderError, setPreorderError] = useState("");
   const [requiresDelivery, setRequiresDelivery] = useState(true);
   const [disposableKits, setDisposableKits] = useState(false);
   const [kitQuantity, setKitQuantity] = useState(1);
@@ -121,9 +137,96 @@ const Paiement = () => {
     ? haversineDistance(coordinates.latitude, coordinates.longitude, Number(restaurantConfig.latitude), Number(restaurantConfig.longitude))
     : 0;
   const isDistanceSuspicious = requiresDelivery && distanceKm > 100;
-  const deliveryFee = requiresDelivery && restaurantId && !isDistanceSuspicious
-    ? Math.ceil(Number(restaurantConfig?.delivery_fee || 0) + distanceKm * Number(restaurantConfig?.delivery_fee_per_km || 0))
-    : 0;
+  const deliveryFee =
+    requiresDelivery && restaurantConfig && coordinates && !isDistanceSuspicious
+      ? distanceKm <= 0.8
+        ? 125
+        : distanceKm <= 1
+          ? 175
+          : distanceKm <= 1.5
+            ? 200
+            : distanceKm <= 2
+              ? 250
+              : distanceKm <= 3
+                ? 400
+                : distanceKm <= 5
+                  ? 500
+                  : distanceKm <= 6
+                    ? 600
+                    : distanceKm <= 7
+                      ? 700
+                      : distanceKm <= 8
+                        ? 800
+                        : distanceKm <= 10
+                          ? 1000
+                          : distanceKm <= 12
+                            ? 1200
+                            : distanceKm <= 15
+                              ? 1500
+                              : distanceKm <= 17
+                                ? 1700
+                                : distanceKm <= 20
+                                  ? 2000
+                                  : 0
+      : 0;
+  useEffect(() => {
+    if (
+      !requiresDelivery ||
+      !coordinates ||
+      restaurantConfig?.latitude == null ||
+      restaurantConfig?.longitude == null
+    ) {
+      setDriverOptions([]);
+      setSelectedDriverId("");
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDriverOptions = async () => {
+      setDriversLoading(true);
+
+      const { data, error } = await (supabase as any).rpc(
+        "get_driver_options",
+        {
+          restaurant_latitude: Number(restaurantConfig.latitude),
+          restaurant_longitude: Number(restaurantConfig.longitude),
+          client_latitude: Number(coordinates.latitude),
+          client_longitude: Number(coordinates.longitude),
+        }
+      );
+
+      if (!cancelled) {
+        if (error) {
+          console.error("Erreur chargement livreurs :", error);
+          setDriverOptions([]);
+        } else {
+          const options = (data || []) as DriverOption[];
+          setDriverOptions(options);
+
+          setSelectedDriverId((current) =>
+            options.some((driver) => driver.driver_id === current)
+              ? current
+              : options[0]?.driver_id || ""
+          );
+        }
+
+        setDriversLoading(false);
+      }
+    };
+
+    void loadDriverOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    requiresDelivery,
+    coordinates?.latitude,
+    coordinates?.longitude,
+    restaurantConfig?.latitude,
+    restaurantConfig?.longitude,
+  ]);
   const disposableKitFee = disposableKits ? Math.max(1, kitQuantity) * Number(restaurantConfig?.disposable_kit_fee || 0) : 0;
   const orderTotal = totalPrice + deliveryFee + disposableKitFee;
 
@@ -189,18 +292,18 @@ const Paiement = () => {
     toast.success("Position manuelle enregistrée.");
   };
 
-  const uploadScreenshot = async (): Promise<string | null> => {
-    if (!screenshot || !user) return null;
+  const uploadScreenshot = async (userId: string): Promise<string | null> => {
+    if (!screenshot) return null;
 
-    const fileExt = screenshot.name.split('.').pop();
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+    const fileExt = screenshot.name.split(".").pop();
+    const fileName = `${userId}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
-      .from('payment-screenshots')
+      .from("payment-screenshots")
       .upload(fileName, screenshot);
 
     if (error) {
-      console.error('Error uploading screenshot:', error);
+      console.error("Error uploading screenshot:", error);
       return null;
     }
 
@@ -248,8 +351,252 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
     location.state?.appliedPromoCode ||
     localStorage.getItem("promoCode") ||
     "";
+    const createPreorder = async () => {
+  try {
+    if (
+      !formData.name ||
+      !formData.phone ||
+      !formData.commune ||
+      !formData.address
+    ) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+
+    if (
+      restaurantId &&
+      (
+        restaurantConfigLoading ||
+        restaurantConfigMissing ||
+        !restaurantConfig
+      )
+    ) {
+      toast.error(
+        restaurantConfigLoading
+          ? "Chargement du restaurant en cours."
+          : "Restaurant introuvable."
+      );
+      return;
+    }
+
+    if (requiresDelivery && !coordinates) {
+      toast.error(
+        "La position GPS est obligatoire pour la livraison."
+      );
+      return;
+    }
+
+    if (requiresDelivery && !selectedDriverId) {
+      toast.error("Veuillez choisir un livreur.");
+      return;
+    }
+
+    if (isDistanceSuspicious) {
+      toast.error("La position du restaurant semble incorrecte.");
+      return;
+    }
+
+    setPreorderLoading(true);
+    setPreorderError("");
+
+    let activeUser = user;
+
+    if (!activeUser) {
+      const { data, error } =
+        await supabase.auth.signInAnonymously();
+
+      if (error || !data.user) {
+        throw new Error(
+          "Impossible de sécuriser la précommande."
+        );
+      }
+
+      activeUser = data.user;
+    }
+
+    const { data: order, error: orderError } =
+      await (supabase as any)
+        .from("orders")
+        .insert({
+          customer_name: formData.name,
+          telephone: formData.phone,
+          address: formData.address,
+          items: JSON.stringify(
+            items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              unit_price: item.price,
+              restaurant_id: item.restaurantId || null,
+            }))
+          ),
+          total: orderTotal,
+          payment_method: "pending_confirmation",
+          transaction_ref: null,
+          status: "pending",
+          payment_status: "pending",
+          promo_code: appliedPromoCode || null,
+          screenshot: null,
+          delivery_country: formData.country,
+          delivery_area: formData.commune,
+          delivery_latitude: coordinates?.latitude ?? null,
+          delivery_longitude: coordinates?.longitude ?? null,
+          delivery_distance_km: distanceKm || null,
+          delivery_fee: deliveryFee,
+          delivery_status: "pending",
+          restaurant_id: restaurantId,
+          requires_delivery: requiresDelivery,
+          disposable_kits: disposableKits,
+          disposable_kit_quantity: disposableKits
+            ? Math.max(1, kitQuantity)
+            : 0,
+          disposable_kit_fee: disposableKitFee,
+          restaurant_confirmation_status: "pending",
+        })
+        .select("id, tracking_number, queue_number")
+        .single();
+
+    if (orderError || !order) {
+      throw new Error(
+        orderError?.message ||
+        "Impossible de créer la précommande."
+      );
+    }
+
+    let confirmationRequired = false;
+
+    for (const item of items) {
+      const match = String(item.id).match(/(\d+)$/);
+      const menuItemId = match ? Number(match[1]) : 0;
+
+      if (!menuItemId) {
+        throw new Error(
+          `Identifiant invalide pour le plat ${item.name}.`
+        );
+      }
+
+      const { data, error } = await (supabase as any).rpc(
+        "reserve_restaurant_item",
+        {
+          p_order_id: order.id,
+          p_menu_item_id: menuItemId,
+          p_quantity: item.quantity,
+        }
+      );
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.requires_confirmation) {
+        confirmationRequired = true;
+      }
+    }
+
+    // Enregistrer la précommande avant le paiement pour le suivi client.
+    if (order.tracking_number) {
+      try {
+        const stored = JSON.parse(localStorage.getItem("albarka_customer_orders") || "[]");
+        const summary = { tracking_number: order.tracking_number, queue_number: order.queue_number, restaurant_name: restaurantConfig?.name || "Commande Albarka", total: orderTotal, created_at: new Date().toISOString() };
+        localStorage.setItem("albarka_customer_orders", JSON.stringify([summary, ...(Array.isArray(stored) ? stored : []).filter((saved: { tracking_number: string }) => saved.tracking_number !== order.tracking_number)].slice(0, 20)));
+        localStorage.setItem("last_order_tracking_number", order.tracking_number);
+      } catch (error) { console.error("Historique client indisponible", error); }
+    }
+    setPreorderId(order.id);
+    setTrackingNumber(order.tracking_number || "");
+    setQueueNumber(order.queue_number || null);
+
+    localStorage.setItem(
+      "pending_preorder_id",
+      order.id
+    );
+
+    if (confirmationRequired) {
+      setPreorderStatus("pending");
+      toast.success(
+        "Précommande envoyée. En attente du restaurant."
+      );
+
+      sendWhatsAppNotification(
+        order,
+        restaurantConfig
+      );
+    } else {
+      setPreorderStatus("accepted");
+      toast.success(
+        "Plats réservés. Vous pouvez maintenant payer."
+      );
+      setStep(2);
+    }
+  } catch (error: any) {
+    console.error("Erreur précommande :", error);
+    setPreorderError(
+      error?.message || "Précommande impossible."
+    );
+    toast.error(
+      error?.message || "Précommande impossible."
+    );
+  } finally {
+    setPreorderLoading(false);
+  }
+};
+useEffect(() => {
+  if (!preorderId || preorderStatus !== "pending") {
+    return;
+  }
+
+  const checkPreorderStatus = async () => {
+    const { data, error } = await (supabase as any)
+      .from("orders")
+      .select(
+        "restaurant_confirmation_status, restaurant_rejection_reason"
+      )
+      .eq("id", preorderId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return;
+    }
+
+    if (data.restaurant_confirmation_status === "accepted") {
+      setPreorderStatus("accepted");
+      toast.success(
+        "Le restaurant a confirmé les plats. Vous pouvez payer."
+      );
+      setStep(2);
+    }
+
+    if (data.restaurant_confirmation_status === "rejected") {
+      setPreorderStatus("rejected");
+      setPreorderError(
+        data.restaurant_rejection_reason ||
+          "Le restaurant a refusé la précommande."
+      );
+      toast.error(
+        data.restaurant_rejection_reason ||
+          "Le restaurant a refusé la précommande."
+      );
+    }
+  };
+
+  void checkPreorderStatus();
+
+  const intervalId = window.setInterval(() => {
+    void checkPreorderStatus();
+  }, 3000);
+
+  return () => {
+    window.clearInterval(intervalId);
+  };
+}, [preorderId, preorderStatus]);
   const handleSubmitOrder = async () => {
     try {
+    if (!preorderId || preorderStatus !== "accepted") {
+  toast.error(
+    "Le restaurant doit confirmer les plats avant le paiement."
+  );
+  return;
+}
       if (
         !formData.name ||
         !formData.phone ||
@@ -295,41 +642,57 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
 
       setIsSubmitting(true);
 
-      // L'upload de la capture necessite un compte connecte (chemin de
-      // stockage prefixe par user.id) ; en invite, la commande est quand
-      // meme enregistree, juste sans capture jointe.
-      const screenshotUrl = selectedMethod !== "cash_on_delivery" && user ? await uploadScreenshot() : null;
+      let activeUser = user;
+
+      if (!activeUser) {
+        const { data: anonymousData, error: anonymousError } =
+          await supabase.auth.signInAnonymously();
+
+        if (anonymousError || !anonymousData.user) {
+          console.error("Anonymous authentication error:", anonymousError);
+          toast.error("Impossible de sécuriser la commande. Veuillez réessayer.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        activeUser = anonymousData.user;
+      }
+
+      const screenshotUrl =
+        selectedMethod !== "cash_on_delivery"
+          ? await uploadScreenshot(activeUser.id)
+          : null;
+
+      if (selectedMethod !== "cash_on_delivery" && !screenshotUrl) {
+        toast.error("Échec de l’envoi de la capture d’écran. Veuillez réessayer.");
+        setIsSubmitting(false);
+        return;
+      }
 
       // La commande doit toujours etre enregistree, connecte ou non,
       // sinon elle n'apparait jamais dans "Gestion des paiements".
-      const { data: order, error: paymentError } = await (supabase as any)
-        .from("orders")
-        .insert({
-          customer_name: formData.name,
-          telephone: formData.phone,
-          address: formData.address,
-          items: JSON.stringify(items.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit_price: item.price, restaurant_id: item.restaurantId || null }))),
-          total: orderTotal,
-          payment_method: selectedMethod,
-          transaction_ref: selectedMethod === "cash_on_delivery" ? null : formData.transactionRef,
-          status: "pending",
-          promo_code: appliedPromoCode || null,
-          screenshot: screenshotUrl,
-          delivery_country: formData.country,
-          delivery_area: formData.commune,
-          delivery_latitude: coordinates?.latitude ?? null,
-          delivery_longitude: coordinates?.longitude ?? null,
-          delivery_distance_km: distanceKm || null,
-          delivery_fee: deliveryFee,
-          delivery_status: "pending",
-          restaurant_id: restaurantId,
-          requires_delivery: requiresDelivery,
-          disposable_kits: disposableKits,
-          disposable_kit_quantity: disposableKits ? Math.max(1, kitQuantity) : 0,
-          disposable_kit_fee: disposableKitFee,
-        })
-        .select("id, tracking_number, queue_number")
-        .single();
+      const {
+  data: paymentRows,
+  error: paymentError,
+} = await (supabase as any).rpc(
+  "submit_preorder_payment",
+  {
+    p_order_id: preorderId,
+    p_payment_method: selectedMethod,
+    p_transaction_ref:
+      selectedMethod === "cash_on_delivery"
+        ? null
+        : formData.transactionRef,
+    p_screenshot:
+      selectedMethod === "cash_on_delivery"
+        ? null
+        : screenshotUrl,
+  }
+);
+
+const order = Array.isArray(paymentRows)
+  ? paymentRows[0]
+  : paymentRows;
 
       if (paymentError) {
         console.error('Error saving payment request:', paymentError);
@@ -337,7 +700,26 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
         setIsSubmitting(false);
         return;
       }
+      if (requiresDelivery && order?.id) {
+        const { error: deliveryError } = await (supabase as any)
+          .from("deliveries")
+          .insert({
+            order_id: order.id,
+            driver_id: selectedDriverId || null,
+            distance_km: distanceKm,
+            pickup_latitude: Number(restaurantConfig?.latitude),
+            pickup_longitude: Number(restaurantConfig?.longitude),
+            delivery_latitude: coordinates?.latitude ?? null,
+            delivery_longitude: coordinates?.longitude ?? null,
+            status: "pending",
+            delivery_fee: deliveryFee,
+          });
 
+        if (deliveryError) {
+          console.error("Erreur création livraison :", deliveryError);
+          toast.error("Commande enregistrée, mais livraison non créée.");
+        }
+      }
       setTrackingNumber(order?.tracking_number || "");
       setQueueNumber(order?.queue_number || null);
       if (order?.tracking_number) {
@@ -387,303 +769,361 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
   const basePaymentMethod = paymentMethods.find(m => m.id === selectedMethod)!;
   const selectedPaymentMethod = restaurantId && selectedMethod !== "cash_on_delivery"
     ? {
-        ...basePaymentMethod,
-        number: restaurantConfig?.payment_phone || "Non configuré",
-        beneficiary: restaurantConfig?.payment_beneficiary || restaurantConfig?.name || "Restaurant partenaire",
-        ussd: "",
-      }
+      ...basePaymentMethod,
+      number: restaurantConfig?.payment_phone || "Non configuré",
+      beneficiary: restaurantConfig?.payment_beneficiary || restaurantConfig?.name || "Restaurant partenaire",
+      ussd: "",
+    }
     : basePaymentMethod;
 
 
-    if (items.length === 0 && step !== 3) {
-      navigate("/panier");
-      return null;
-    }
+  if (items.length === 0 && step !== 3) {
+    navigate("/panier");
+    return null;
+  }
 
-    return (
-      <main className="min-h-screen py-12 md:py-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto">
-            <div className="mb-5 flex justify-start">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => step === 1 ? navigate("/panier") : step === 2 ? setStep(1) : navigate("/")}
-              >
-                ← {step === 1 ? "Retour au panier" : step === 2 ? "Retour aux informations" : "Retour à l'accueil"}
-              </Button>
+  return (
+    <main className="min-h-screen py-12 md:py-16">
+      <div className="container mx-auto px-4">
+        <div className="max-w-3xl mx-auto">
+          <div className="mb-5 flex justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => step === 1 ? navigate("/panier") : step === 2 ? setStep(1) : navigate("/")}
+            >
+              ← {step === 1 ? "Retour au panier" : step === 2 ? "Retour aux informations" : "Retour à l'accueil"}
+            </Button>
+          </div>
+          {/* Progress Steps */}
+          {appliedPromoCode && (
+            <div className="bg-green-500/10 border border-green-500 text-green-400 p-3 rounded-lg mb-6">
+              Code partenaire appliqué : <strong>{appliedPromoCode}</strong>
             </div>
-            {/* Progress Steps */}
-            {appliedPromoCode && (
-              <div className="bg-green-500/10 border border-green-500 text-green-400 p-3 rounded-lg mb-6">
-                Code partenaire appliqué : <strong>{appliedPromoCode}</strong>
-              </div>
-            )}
-            <div className="flex items-center justify-center mb-12">
-              {[1, 2, 3].map((s) => (
-                <div key={s} className="flex items-center">
+          )}
+          <div className="flex items-center justify-center mb-12">
+            {[1, 2, 3].map((s) => (
+              <div key={s} className="flex items-center">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= s
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                    }`}
+                >
+                  {step > s ? <CheckCircle className="w-5 h-5" /> : s}
+                </div>
+                {s < 3 && (
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= s
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                    className={`w-16 md:w-24 h-1 mx-2 ${step > s ? "bg-primary" : "bg-muted"
                       }`}
-                  >
-                    {step > s ? <CheckCircle className="w-5 h-5" /> : s}
-                  </div>
-                  {s < 3 && (
-                    <div
-                      className={`w-16 md:w-24 h-1 mx-2 ${step > s ? "bg-primary" : "bg-muted"
-                        }`}
-                    />
-                  )}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Step 1: Delivery Info */}
+          {step === 1 && (
+            <div className="bg-card rounded-2xl p-6 md:p-8 shadow-sm border border-border animate-fade-in">
+              <h2 className="font-display text-2xl font-bold text-foreground mb-6">
+                Informations de Livraison
+              </h2>
+
+              <div className="space-y-5">
+                <div>
+                  <Label htmlFor="name">Nom complet *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Votre nom complet"
+                    className="mt-1.5"
+                  />
                 </div>
-              ))}
-            </div>
+                <div>
+                  <Label htmlFor="country">Pays *</Label>
+                  <select
+                    id="country"
+                    name="country"
+                    value={formData.country}
+                    onChange={handleInputChange}
+                    className="mt-1.5 w-full rounded-md border p-3 text-black"
+                  >
+                    <option value="CI">🇨🇮 Côte d'Ivoire (+225)</option>
+                    <option value="BF">🇧🇫 Burkina Faso (+226)</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="phone">Numéro de téléphone *</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder={
+                      formData.country === "CI"
+                        ? "+225 XX XX XX XX XX"
+                        : "+226 XX XX XX XX"
+                    }
+                    className="mt-1.5"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="commune">Commune *</Label>
 
-            {/* Step 1: Delivery Info */}
-            {step === 1 && (
-              <div className="bg-card rounded-2xl p-6 md:p-8 shadow-sm border border-border animate-fade-in">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-6">
-                  Informations de Livraison
-                </h2>
+                  <select
+                    id="commune"
+                    name="commune"
+                    value={formData.commune}
+                    onChange={handleInputChange}
+                    className="mt-1.5 w-full rounded-md border p-3 text-black"
+                  >
+                    <option value="">Sélectionnez une commune</option>
 
-                <div className="space-y-5">
-                  <div>
-                    <Label htmlFor="name">Nom complet *</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Votre nom complet"
-                      className="mt-1.5"
-                    />
+                    {formData.country === "CI" ? (
+                      <>
+                        <option value="Cocody">Cocody</option>
+                        <option value="Yopougon">Yopougon</option>
+                        <option value="Marcory">Marcory</option>
+                        <option value="Treichville">Treichville</option>
+                        <option value="Plateau">Plateau</option>
+                        <option value="Adjamé">Adjamé</option>
+                        <option value="Abobo">Abobo</option>
+                        <option value="Koumassi">Koumassi</option>
+                        <option value="Port-Bouët">Port-Bouët</option>
+                        <option value="Bingerville">Bingerville</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Secteur 10">Secteur 10</option>
+                        <option value="Secteur 11">Secteur 11</option>
+                        <option value="Secteur 12">Secteur 12</option>
+                        <option value="Ouaga 2000">Ouaga 2000</option>
+                        <option value="Tampouy">Tampouy</option>
+                        <option value="Pissy">Pissy</option>
+                        <option value="Karpala">Karpala</option>
+                        <option value="Zogona">Zogona</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="address">Adresse de livraison *</Label>
+                  <Textarea
+                    id="address"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    placeholder={
+                      formData.country === "CI"
+                        ? "Commune, quartier, rue, repères (ex: Cocody Angré, près de la CNPS)"
+                        : "Secteur, quartier, rue, repères (ex: Secteur 10, près de Marina Market)"
+                    }
+                    className="mt-1.5"
+                    rows={3}
+                  />
+                  <p className="text-sm text-gray-400 mt-2">
+                    {formData.country === "CI"
+                      ? "Exemple : Cocody Angré 8ème tranche, près de la CNPS"
+                      : "Exemple : Ouagadougou, Secteur 10, près de Marina Market"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <p className="font-medium">Position de livraison</p>
+                      <p className="text-sm text-muted-foreground">Validez la demande du navigateur. Votre position sera enregistrée automatiquement, sans saisir de coordonnées.</p>
+                    </div>
+                    <Button type="button" onClick={captureLocation} disabled={isLocating} className="min-h-14 w-full gap-2 text-base">
+                      <LocateFixed className="w-4 h-4" />
+                      {isLocating ? "Recherche de votre position..." : coordinates ? "Position enregistrée" : "Autoriser et enregistrer ma position"}
+                    </Button>
                   </div>
-                  <div>
-                    <Label htmlFor="country">Pays *</Label>
-                    <select
-                      id="country"
-                      name="country"
-                      value={formData.country}
-                      onChange={handleInputChange}
-                      className="mt-1.5 w-full rounded-md border p-3 text-black"
-                    >
-                      <option value="CI">🇨🇮 Côte d'Ivoire (+225)</option>
-                      <option value="BF">🇧🇫 Burkina Faso (+226)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Numéro de téléphone *</Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder={
-                        formData.country === "CI"
-                          ? "+225 XX XX XX XX XX"
-                          : "+226 XX XX XX XX"
-                      }
-                      className="mt-1.5"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="commune">Commune *</Label>
-
-                    <select
-                      id="commune"
-                      name="commune"
-                      value={formData.commune}
-                      onChange={handleInputChange}
-                      className="mt-1.5 w-full rounded-md border p-3 text-black"
-                    >
-                      <option value="">Sélectionnez une commune</option>
-
-                      {formData.country === "CI" ? (
-                        <>
-                          <option value="Cocody">Cocody</option>
-                          <option value="Yopougon">Yopougon</option>
-                          <option value="Marcory">Marcory</option>
-                          <option value="Treichville">Treichville</option>
-                          <option value="Plateau">Plateau</option>
-                          <option value="Adjamé">Adjamé</option>
-                          <option value="Abobo">Abobo</option>
-                          <option value="Koumassi">Koumassi</option>
-                          <option value="Port-Bouët">Port-Bouët</option>
-                          <option value="Bingerville">Bingerville</option>
-                        </>
-                      ) : (
-                        <>
-                          <option value="Secteur 10">Secteur 10</option>
-                          <option value="Secteur 11">Secteur 11</option>
-                          <option value="Secteur 12">Secteur 12</option>
-                          <option value="Ouaga 2000">Ouaga 2000</option>
-                          <option value="Tampouy">Tampouy</option>
-                          <option value="Pissy">Pissy</option>
-                          <option value="Karpala">Karpala</option>
-                          <option value="Zogona">Zogona</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="address">Adresse de livraison *</Label>
-                    <Textarea
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder={
-                        formData.country === "CI"
-                          ? "Commune, quartier, rue, repères (ex: Cocody Angré, près de la CNPS)"
-                          : "Secteur, quartier, rue, repères (ex: Secteur 10, près de Marina Market)"
-                      }
-                      className="mt-1.5"
-                      rows={3}
-                    />
-                    <p className="text-sm text-gray-400 mt-2">
-                      {formData.country === "CI"
-                        ? "Exemple : Cocody Angré 8ème tranche, près de la CNPS"
-                        : "Exemple : Ouagadougou, Secteur 10, près de Marina Market"}
+                  {coordinates && (
+                    <p className="mt-3 flex items-center gap-2 text-sm text-green-700">
+                      <MapPin className="w-4 h-4" /> Position enregistrée pour le suivi de la livraison.
                     </p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-muted/30 p-4">
-                    <div className="flex flex-col gap-3">
-                      <div>
-                        <p className="font-medium">Position de livraison</p>
-                        <p className="text-sm text-muted-foreground">Validez la demande du navigateur. Votre position sera enregistrée automatiquement, sans saisir de coordonnées.</p>
-                      </div>
-                      <Button type="button" onClick={captureLocation} disabled={isLocating} className="min-h-14 w-full gap-2 text-base">
-                        <LocateFixed className="w-4 h-4" />
-                        {isLocating ? "Recherche de votre position..." : coordinates ? "Position enregistrée" : "Autoriser et enregistrer ma position"}
-                      </Button>
-                    </div>
-                    {coordinates && (
-                      <p className="mt-3 flex items-center gap-2 text-sm text-green-700">
-                        <MapPin className="w-4 h-4" /> Position enregistrée pour le suivi de la livraison.
-                      </p>
-                    )}
-                    {!coordinates && (
-                      <div className="mt-3 grid gap-2">
-                        {(restaurantConfig?.whatsapp || restaurantConfig?.telephone) && (
-                          <a href={`https://wa.me/${String(restaurantConfig.whatsapp || restaurantConfig.telephone).replace(/\D/g, "")}?text=${encodeURIComponent("Bonjour, je passe une commande Albarka. Je vais maintenant vous envoyer ma position actuelle.")}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center rounded-lg bg-green-600 px-4 py-3 text-center text-base font-bold text-white">
-                            <Phone className="mr-2 h-5 w-5" /> Partager ma position sur WhatsApp
-                          </a>
-                        )}
-                        <div className="rounded-lg bg-green-500/10 p-3 text-sm">
-                          <p className="font-semibold">Après l'ouverture de WhatsApp :</p>
-                          <p className="mt-1">1. Appuyez sur 📎 ou +</p>
-                          <p>2. Choisissez « Localisation »</p>
-                          <p>3. Appuyez sur « Envoyer votre position actuelle »</p>
-                          <p className="mt-2 text-xs text-muted-foreground">Votre panier restera enregistré lorsque vous reviendrez sur cette page.</p>
-                        </div>
-                      </div>
-                    )}
-                    <button type="button" className="mt-3 text-xs font-medium text-muted-foreground underline" onClick={() => setShowManualLocation((visible) => !visible)}>
-                      {showManualLocation ? "Masquer l'assistance avancée" : "Le GPS ne fonctionne pas ? Assistance avancée"}
-                    </button>
-                    {showManualLocation && (
-                      <div className="mt-3 grid gap-3 rounded-lg border border-border bg-background p-3 sm:grid-cols-2">
-                        <div><Label htmlFor="manualLatitude">Latitude</Label><Input id="manualLatitude" inputMode="decimal" value={manualLatitude} onChange={(event) => setManualLatitude(event.target.value)} placeholder="Ex. 5.3599" /></div>
-                        <div><Label htmlFor="manualLongitude">Longitude</Label><Input id="manualLongitude" inputMode="decimal" value={manualLongitude} onChange={(event) => setManualLongitude(event.target.value)} placeholder="Ex. -4.0083" /></div>
-                        <Button type="button" variant="secondary" className="sm:col-span-2" onClick={saveManualLocation}>Enregistrer ces coordonnées</Button>
-                        <p className="text-xs text-muted-foreground sm:col-span-2">Vous pouvez obtenir ces valeurs en maintenant le doigt sur votre position dans Google Maps.</p>
-                      </div>
-                    )}
-                  </div>
-                  {restaurantId && (
-                    <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
-                      <label className="flex cursor-pointer items-start gap-3">
-                        <input type="checkbox" className="mt-1 h-4 w-4" checked={requiresDelivery} onChange={(event) => setRequiresDelivery(event.target.checked)} />
-                        <span><strong>Livraison à domicile</strong><span className="block text-sm text-muted-foreground">Frais calculés selon la distance depuis le restaurant.</span></span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-3">
-                        <input type="checkbox" className="mt-1 h-4 w-4" checked={disposableKits} onChange={(event) => { setDisposableKits(event.target.checked); if (event.target.checked) setKitQuantity(Math.max(1, totalItems)); }} />
-                        <span className="flex-1"><strong>Ajouter des kits jetables</strong><span className="block text-sm text-muted-foreground">Facturés {formatPrice(Number(restaurantConfig?.disposable_kit_fee || 0))} par personne.</span></span>
-                      </label>
-                      {disposableKits && <div><Label htmlFor="kitQuantity">Nombre de personnes</Label><Input id="kitQuantity" className="mt-1 w-32" type="number" min="1" value={kitQuantity} onChange={(event) => setKitQuantity(Math.max(1, Number(event.target.value) || 1))} /></div>}
-                      <div className="space-y-1 border-t pt-3 text-sm">
-                        {requiresDelivery && <div className="flex justify-between"><span>Distance estimée</span><strong className={isDistanceSuspicious ? "text-destructive" : ""}>{distanceKm ? `${distanceKm.toFixed(1)} km` : "Ajoutez votre position GPS"}</strong></div>}
-                        {requiresDelivery && locationAccuracy != null && <div className="flex justify-between text-xs text-muted-foreground"><span>Précision GPS</span><span>± {Math.round(locationAccuracy)} m</span></div>}
-                        {isDistanceSuspicious && <p className="text-sm text-destructive">La position GPS du restaurant semble incorrecte. Aucun frais ne sera calculé tant qu’elle n’est pas corrigée.</p>}
-                        <div className="flex justify-between"><span>Frais de livraison</span><strong>{isDistanceSuspicious ? "À vérifier" : formatPrice(deliveryFee)}</strong></div>
-                        {disposableKits && <div className="flex justify-between"><span>Kits jetables</span><strong>{formatPrice(disposableKitFee)}</strong></div>}
+                  )}
+                  {!coordinates && (
+                    <div className="mt-3 grid gap-2">
+                      {(restaurantConfig?.whatsapp || restaurantConfig?.telephone) && (
+                        <a href={`https://wa.me/${String(restaurantConfig.whatsapp || restaurantConfig.telephone).replace(/\D/g, "")}?text=${encodeURIComponent("Bonjour, je passe une commande Albarka. Je vais maintenant vous envoyer ma position actuelle.")}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center rounded-lg bg-green-600 px-4 py-3 text-center text-base font-bold text-white">
+                          <Phone className="mr-2 h-5 w-5" /> Partager ma position sur WhatsApp
+                        </a>
+                      )}
+                      <div className="rounded-lg bg-green-500/10 p-3 text-sm">
+                        <p className="font-semibold">Après l'ouverture de WhatsApp :</p>
+                        <p className="mt-1">1. Appuyez sur 📎 ou +</p>
+                        <p>2. Choisissez « Localisation »</p>
+                        <p>3. Appuyez sur « Envoyer votre position actuelle »</p>
+                        <p className="mt-2 text-xs text-muted-foreground">Votre panier restera enregistré lorsque vous reviendrez sur cette page.</p>
                       </div>
                     </div>
                   )}
+                  <button type="button" className="mt-3 text-xs font-medium text-muted-foreground underline" onClick={() => setShowManualLocation((visible) => !visible)}>
+                    {showManualLocation ? "Masquer l'assistance avancée" : "Le GPS ne fonctionne pas ? Assistance avancée"}
+                  </button>
+                  {showManualLocation && (
+                    <div className="mt-3 grid gap-3 rounded-lg border border-border bg-background p-3 sm:grid-cols-2">
+                      <div><Label htmlFor="manualLatitude">Latitude</Label><Input id="manualLatitude" inputMode="decimal" value={manualLatitude} onChange={(event) => setManualLatitude(event.target.value)} placeholder="Ex. 5.3599" /></div>
+                      <div><Label htmlFor="manualLongitude">Longitude</Label><Input id="manualLongitude" inputMode="decimal" value={manualLongitude} onChange={(event) => setManualLongitude(event.target.value)} placeholder="Ex. -4.0083" /></div>
+                      <Button type="button" variant="secondary" className="sm:col-span-2" onClick={saveManualLocation}>Enregistrer ces coordonnées</Button>
+                      <p className="text-xs text-muted-foreground sm:col-span-2">Vous pouvez obtenir ces valeurs en maintenant le doigt sur votre position dans Google Maps.</p>
+                    </div>
+                  )}
                 </div>
+                {restaurantId && (
+                  <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input type="checkbox" className="mt-1 h-4 w-4" checked={requiresDelivery} onChange={(event) => setRequiresDelivery(event.target.checked)} />
+                      <span><strong>Livraison à domicile</strong><span className="block text-sm text-muted-foreground">Frais calculés selon la distance depuis le restaurant.</span></span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input type="checkbox" className="mt-1 h-4 w-4" checked={disposableKits} onChange={(event) => { setDisposableKits(event.target.checked); if (event.target.checked) setKitQuantity(Math.max(1, totalItems)); }} />
+                      <span className="flex-1"><strong>Ajouter des kits jetables</strong><span className="block text-sm text-muted-foreground">Facturés {formatPrice(Number(restaurantConfig?.disposable_kit_fee || 0))} par personne.</span></span>
+                    </label>
+                    {disposableKits && <div><Label htmlFor="kitQuantity">Nombre de personnes</Label><Input id="kitQuantity" className="mt-1 w-32" type="number" min="1" value={kitQuantity} onChange={(event) => setKitQuantity(Math.max(1, Number(event.target.value) || 1))} /></div>}
+                    <div className="space-y-1 border-t pt-3 text-sm">
+                      {requiresDelivery && <div className="flex justify-between"><span>Distance estimée</span><strong className={isDistanceSuspicious ? "text-destructive" : ""}>{distanceKm ? `${distanceKm.toFixed(1)} km` : "Ajoutez votre position GPS"}</strong></div>}
+                      {requiresDelivery && locationAccuracy != null && <div className="flex justify-between text-xs text-muted-foreground"><span>Précision GPS</span><span>± {Math.round(locationAccuracy)} m</span></div>}
+                      {isDistanceSuspicious && <p className="text-sm text-destructive">La position GPS du restaurant semble incorrecte. Aucun frais ne sera calculé tant qu’elle n’est pas corrigée.</p>}
+                      <div className="flex justify-between"><span>Frais de livraison</span><strong>{isDistanceSuspicious ? "À vérifier" : formatPrice(deliveryFee)}</strong></div>
+                      {disposableKits && <div className="flex justify-between"><span>Kits jetables</span><strong>{formatPrice(disposableKitFee)}</strong></div>}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {requiresDelivery && (
+                <div className="mb-6 rounded-xl border border-border p-4">
+                  <h3 className="mb-3 text-lg font-bold">
+                    Choisissez votre livreur
+                  </h3>
 
-                <div className="mt-8 flex justify-end">
-                  <Button
-                    variant="default"
-                    size="lg"
-                    onClick={() => setStep(2)}
-                    disabled={!formData.name || !formData.phone || !formData.address || (requiresDelivery && !coordinates)}
-                  >
-                    Continuer vers le paiement
-                  </Button>
+                  {driversLoading ? (
+                    <p>Recherche des livreurs...</p>
+                  ) : driverOptions.length === 0 ? (
+                    <p className="text-muted-foreground">
+                      Aucun livreur localisé actuellement.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {driverOptions.map((driver) => (
+                        <button
+                          type="button"
+                          key={driver.driver_id}
+                          onClick={() => setSelectedDriverId(driver.driver_id)}
+                          className={`w-full rounded-lg border p-4 text-left transition ${selectedDriverId === driver.driver_id
+                            ? "border-green-500 bg-green-500/10 ring-2 ring-green-500"
+                            : "border-border"
+                            }`}
+                        >
+                          <div className="flex justify-between gap-3">
+                            <strong>{driver.driver_name}</strong>
+
+                            <span
+                              className={
+                                driver.is_available
+                                  ? "text-green-500"
+                                  : "text-orange-500"
+                              }
+                            >
+                              {driver.is_available
+                                ? "Disponible"
+                                : "Déjà en livraison"}
+                            </span>
+                          </div>
+
+                          <p className="mt-2">
+                            Arrivée au restaurant :{" "}
+                            {driver.distance_to_restaurant_km} km
+                          </p>
+
+                          <p>
+                            Trajet total : {driver.total_distance_km} km
+                          </p>
+
+                          <p className="font-semibold">
+                            Temps estimé : {driver.estimated_minutes} minutes
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="mt-8 flex justify-end">
+                <Button
+                  variant="default"
+                  size="lg"
+                 onClick={() => void createPreorder()}
+                  disabled={!formData.name || !formData.phone || !formData.address || (requiresDelivery && !coordinates) || (requiresDelivery && !selectedDriverId)}
+                >
+                  Continuer vers le paiement
+
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Mobile Money Payment */}
+          {step === 2 && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Order Summary - compact */}
+              <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
+                <h3 className="font-semibold mb-3">🛒 Votre commande</h3>
+                <div className="space-y-1.5 mb-3">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {item.name} x{item.quantity}
+                      </span>
+                      <span>{formatPrice(item.price * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-border pt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-lg">Total</span>
+                    <span className="text-2xl font-bold text-primary">
+                      {formatPrice(orderTotal)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Step 2: Mobile Money Payment */}
-            {step === 2 && (
-              <div className="space-y-6 animate-fade-in">
-                {/* Order Summary - compact */}
-                <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
-                  <h3 className="font-semibold mb-3">🛒 Votre commande</h3>
-                  <div className="space-y-1.5 mb-3">
-                    {items.map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {item.name} x{item.quantity}
-                        </span>
-                        <span>{formatPrice(item.price * item.quantity)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-border pt-3">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-lg">Total</span>
-                      <span className="text-2xl font-bold text-primary">
-                        {formatPrice(orderTotal)}
-                      </span>
-                    </div>
-                  </div>
+              {/* Payment Method Selection */}
+              <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
+                <h3 className="font-semibold mb-3 text-lg">
+                  💳 Comment voulez-vous payer ?
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {paymentMethods.map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => setSelectedMethod(method.id)}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${selectedMethod === method.id
+                        ? `${method.bgColor} ${method.borderColor} border-2 ring-2 ring-offset-2 ring-primary/30`
+                        : "border-border hover:border-primary/30"
+                        }`}
+                    >
+                      <p className={`font-bold text-base ${selectedMethod === method.id ? method.color : "text-foreground"}`}>
+                        {method.name}
+                      </p>
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Payment Method Selection */}
-                <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
-                  <h3 className="font-semibold mb-3 text-lg">
-                    💳 Comment voulez-vous payer ?
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {paymentMethods.map((method) => (
-                      <button
-                        key={method.id}
-                        onClick={() => setSelectedMethod(method.id)}
-                        className={`p-4 rounded-xl border-2 transition-all text-left ${selectedMethod === method.id
-                          ? `${method.bgColor} ${method.borderColor} border-2 ring-2 ring-offset-2 ring-primary/30`
-                          : "border-border hover:border-primary/30"
-                          }`}
-                      >
-                        <p className={`font-bold text-base ${selectedMethod === method.id ? method.color : "text-foreground"}`}>
-                          {method.name}
-                        </p>
-                      </button>
-                    ))}
+              {/* Step-by-step Instructions for novices */}
+              <div className={`rounded-2xl p-5 md:p-8 border-2 ${selectedPaymentMethod.bgColor} ${selectedPaymentMethod.borderColor}`}>
+                {selectedMethod === "cash_on_delivery" ? (
+                  <div className="rounded-xl border border-primary/30 bg-card p-6 text-center">
+                    <CheckCircle className="mx-auto h-12 w-12 text-primary" />
+                    <h2 className="mt-4 text-xl font-bold">Payez à la réception</h2>
+                    <p className="mt-2 text-muted-foreground">Aucune capture d'écran ni référence de transaction n'est nécessaire. Préparez {formatPrice(orderTotal)} lors de la livraison.</p>
                   </div>
-                </div>
-
-                {/* Step-by-step Instructions for novices */}
-                <div className={`rounded-2xl p-5 md:p-8 border-2 ${selectedPaymentMethod.bgColor} ${selectedPaymentMethod.borderColor}`}>
-                  {selectedMethod === "cash_on_delivery" ? (
-                    <div className="rounded-xl border border-primary/30 bg-card p-6 text-center">
-                      <CheckCircle className="mx-auto h-12 w-12 text-primary" />
-                      <h2 className="mt-4 text-xl font-bold">Payez à la réception</h2>
-                      <p className="mt-2 text-muted-foreground">Aucune capture d'écran ni référence de transaction n'est nécessaire. Préparez {formatPrice(orderTotal)} lors de la livraison.</p>
-                    </div>
-                  ) : (<>
+                ) : (<>
                   <h2 className="font-display text-xl font-bold text-foreground mb-6 text-center">
                     📱 Comment payer en 3 étapes
                   </h2>
@@ -834,89 +1274,89 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
                       Envoyer par WhatsApp
                     </a>
                   </div>
-                  </>)}
+                </>)}
 
-                  {/* Action buttons */}
-                  <div className="flex flex-col gap-3">
-                    <Button
-                      size="lg"
-                      onClick={handleSubmitOrder}
-                      disabled={isSubmitting}
-                      className={`w-full h-14 text-lg font-bold ${selectedMethod === 'orange_money'
-                        ? 'bg-orange-500 hover:bg-orange-600'
-                        : selectedMethod === 'wave'
-                          ? 'bg-blue-500 hover:bg-blue-600'
-                          : selectedMethod === 'moov_money'
-                            ? 'bg-green-500 hover:bg-green-600'
-                            : 'bg-primary hover:bg-primary/90'
-                        } text-white`}
-                    >
-                      {isSubmitting ? "Envoi en cours..." : "✅ Confirmer ma commande"}
-                    </Button>
-                    <Button variant="ghost" size="lg" onClick={() => setStep(1)} className="w-full">
-                      ← Retour
-                    </Button>
-                  </div>
+                {/* Action buttons */}
+                <div className="flex flex-col gap-3">
+                  <Button
+                    size="lg"
+                    onClick={handleSubmitOrder}
+                    disabled={isSubmitting}
+                    className={`w-full h-14 text-lg font-bold ${selectedMethod === 'orange_money'
+                      ? 'bg-orange-500 hover:bg-orange-600'
+                      : selectedMethod === 'wave'
+                        ? 'bg-blue-500 hover:bg-blue-600'
+                        : selectedMethod === 'moov_money'
+                          ? 'bg-green-500 hover:bg-green-600'
+                          : 'bg-primary hover:bg-primary/90'
+                      } text-white`}
+                  >
+                    {isSubmitting ? "Envoi en cours..." : "✅ Confirmer ma commande"}
+                  </Button>
+                  <Button variant="ghost" size="lg" onClick={() => setStep(1)} className="w-full">
+                    ← Retour
+                  </Button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Step 3: Confirmation */}
-            {step === 3 && (
-              <div className="text-center animate-fade-in">
-                <div className="w-24 h-24 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="w-14 h-14 text-secondary" />
+          {/* Step 3: Confirmation */}
+          {step === 3 && (
+            <div className="text-center animate-fade-in">
+              <div className="w-24 h-24 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-14 h-14 text-secondary" />
+              </div>
+              <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-3">
+                Commande Envoyée!
+              </h2>
+              <p className="text-muted-foreground max-w-md mx-auto mb-8">
+                {selectedMethod === "cash_on_delivery"
+                  ? "Votre commande a été enregistrée. Vous réglerez le montant au moment de la livraison."
+                  : "Votre commande a été enregistrée avec succès. Notre équipe vérifiera votre paiement et vous contactera pour confirmer la livraison."}
+              </p>
+
+              <div className="bg-card rounded-xl p-6 max-w-md mx-auto mb-8 border border-border">
+                <h3 className="font-semibold mb-4">Statut de la commande</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="w-3 h-3 rounded-full bg-gold animate-pulse" />
+                    <span>{selectedMethod === "cash_on_delivery" ? "Commande reçue — paiement prévu à la livraison" : "En attente de vérification du paiement"}</span>
+                  </div>
                 </div>
-                <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-3">
-                  Commande Envoyée!
-                </h2>
-                <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                  {selectedMethod === "cash_on_delivery"
-                    ? "Votre commande a été enregistrée. Vous réglerez le montant au moment de la livraison."
-                    : "Votre commande a été enregistrée avec succès. Notre équipe vérifiera votre paiement et vous contactera pour confirmer la livraison."}
+                <p className="text-xs text-muted-foreground mt-4">
+                  Nous vous contacterons dans les 10 minutes pour confirmer votre commande
                 </p>
-
-                <div className="bg-card rounded-xl p-6 max-w-md mx-auto mb-8 border border-border">
-                  <h3 className="font-semibold mb-4">Statut de la commande</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="w-3 h-3 rounded-full bg-gold animate-pulse" />
-                      <span>{selectedMethod === "cash_on_delivery" ? "Commande reçue — paiement prévu à la livraison" : "En attente de vérification du paiement"}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    Nous vous contacterons dans les 10 minutes pour confirmer votre commande
-                  </p>
-                </div>
-
-                {trackingNumber && (
-                  <div className="bg-primary/10 border border-primary/30 rounded-xl p-5 max-w-md mx-auto mb-8">
-                    <p className="text-sm text-muted-foreground">Numéro de suivi livraison</p>
-                    <p className="font-mono text-xl font-bold text-primary mt-1">{trackingNumber}</p>
-                    <p className="text-xs text-muted-foreground mt-2">Conservez ce numéro : il permet à notre équipe de suivre votre livraison.</p>
-                  </div>
-                )}
-
-                {queueNumber && (
-                  <div className="bg-secondary/10 border border-secondary/30 rounded-xl p-5 max-w-md mx-auto mb-8">
-                    <p className="text-sm text-muted-foreground">Votre ticket restaurant</p>
-                    <p className="font-mono text-3xl font-bold text-secondary mt-1">N° {queueNumber}</p>
-                    <p className="text-xs text-muted-foreground mt-2">Ouvrez le suivi pour connaître le nombre de commandes devant vous.</p>
-                  </div>
-                )}
-
-                {trackingNumber && <Button variant="outline" size="lg" className="mb-3" onClick={() => navigate("/suivi-livraison")}>Suivre ma livraison</Button>}
-
-                <Button variant="default" size="lg" onClick={() => navigate("/")}>
-                  Retour à l'accueil
-                </Button>
               </div>
-            )}
-          </div>
+
+              {trackingNumber && (
+                <div className="bg-primary/10 border border-primary/30 rounded-xl p-5 max-w-md mx-auto mb-8">
+                  <p className="text-sm text-muted-foreground">Numéro de suivi livraison</p>
+                  <p className="font-mono text-xl font-bold text-primary mt-1">{trackingNumber}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Conservez ce numéro : il permet à notre équipe de suivre votre livraison.</p>
+                </div>
+              )}
+
+              {queueNumber && (
+                <div className="bg-secondary/10 border border-secondary/30 rounded-xl p-5 max-w-md mx-auto mb-8">
+                  <p className="text-sm text-muted-foreground">Votre ticket restaurant</p>
+                  <p className="font-mono text-3xl font-bold text-secondary mt-1">N° {queueNumber}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Ouvrez le suivi pour connaître le nombre de commandes devant vous.</p>
+                </div>
+              )}
+
+              {trackingNumber && <Button variant="outline" size="lg" className="mb-3" onClick={() => navigate("/suivi-livraison")}>Suivre ma livraison</Button>}
+
+              <Button variant="default" size="lg" onClick={() => navigate("/")}>
+                Retour à l'accueil
+              </Button>
+            </div>
+          )}
         </div>
-      </main>
-    );
-  };
+      </div>
+    </main>
+  );
+};
 
 const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const toRadians = (value: number) => value * Math.PI / 180;
@@ -928,4 +1368,4 @@ const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-  export default Paiement;
+export default Paiement;

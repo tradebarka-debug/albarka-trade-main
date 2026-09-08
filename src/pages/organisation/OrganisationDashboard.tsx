@@ -62,6 +62,7 @@ export default function OrganisationDashboard() {
   const [menuImageFile, setMenuImageFile] = useState<File | null>(null);
   const [menuImagePreview, setMenuImagePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [respondingPreorderId, setRespondingPreorderId] = useState<string | null>(null);
   const [openingBalance, setOpeningBalance] = useState("");
   const [closingBalance, setClosingBalance] = useState("");
   const [financeForm, setFinanceForm] = useState({ entry_type: "expense", category: "", amount: "", payment_method: "cash", description: "" });
@@ -160,12 +161,12 @@ export default function OrganisationDashboard() {
     setWarehouseForm(
       warehouse
         ? {
-            id: warehouse.id,
-            name: warehouse.name,
-            address: warehouse.address ?? "",
-            latitude: warehouse.latitude?.toString() ?? "",
-            longitude: warehouse.longitude?.toString() ?? "",
-          }
+          id: warehouse.id,
+          name: warehouse.name,
+          address: warehouse.address ?? "",
+          latitude: warehouse.latitude?.toString() ?? "",
+          longitude: warehouse.longitude?.toString() ?? "",
+        }
         : emptyWarehouseForm
     );
     setWarehouseDialogOpen(true);
@@ -205,14 +206,14 @@ export default function OrganisationDashboard() {
     setProductForm(
       product
         ? {
-            id: product.id,
-            name: product.name,
-            description: product.description ?? "",
-            category: product.category ?? "",
-            price: String(product.price),
-            unit: product.unit ?? "",
-            image: product.image ?? "",
-          }
+          id: product.id,
+          name: product.name,
+          description: product.description ?? "",
+          category: product.category ?? "",
+          price: String(product.price),
+          unit: product.unit ?? "",
+          image: product.image ?? "",
+        }
         : emptyProductForm
     );
     setProductImageFile(null);
@@ -321,13 +322,13 @@ export default function OrganisationDashboard() {
     setMenuItemForm(
       item
         ? {
-            id: item.id,
-            name: item.name,
-            description: item.description ?? "",
-            price: String(item.price),
-            image_url: item.image_url ?? "",
-            is_available: item.is_available ?? true,
-          }
+          id: item.id,
+          name: item.name,
+          description: item.description ?? "",
+          price: String(item.price),
+          image_url: item.image_url ?? "",
+          is_available: item.is_available ?? true,
+        }
         : emptyMenuItemForm
     );
     setMenuImageFile(null);
@@ -444,7 +445,57 @@ export default function OrganisationDashboard() {
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   };
+  const respondToPreorder = async (
+    orderId: string,
+    accept: boolean
+  ) => {
+    let rejectionReason: string | null = null;
 
+    if (!accept) {
+      rejectionReason = window.prompt(
+        "Pourquoi cette précommande est-elle refusée ?"
+      );
+
+      if (!rejectionReason?.trim()) {
+        toast({
+          title: "Motif obligatoire",
+          description: "Veuillez indiquer le motif du refus.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    setRespondingPreorderId(orderId);
+
+    try {
+      await callAction("respond_restaurant_preorder", {
+        order_id: orderId,
+        accept,
+        rejection_reason: rejectionReason,
+      });
+
+      toast({
+        title: accept
+          ? "Précommande acceptée"
+          : "Précommande refusée",
+        description: accept
+          ? "Le client peut maintenant effectuer le paiement."
+          : "Le client sera informé du refus.",
+      });
+
+      await refetch();
+    } catch (responseError: any) {
+      toast({
+        title: "Réponse impossible",
+        description:
+          responseError?.message || "Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } finally {
+      setRespondingPreorderId(null);
+    }
+  };
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
       await callAction("update_restaurant_order_status", { order_id: orderId, status });
@@ -554,6 +605,9 @@ export default function OrganisationDashboard() {
             <>
               <TabsTrigger value="restaurant">Mon restaurant</TabsTrigger>
               <TabsTrigger value="menu">Menu</TabsTrigger>
+              <TabsTrigger value="precommandes">
+                Précommandes
+            </TabsTrigger>
               <TabsTrigger value="commandes">Commandes</TabsTrigger>
               {capabilities.manageCash && <TabsTrigger value="caisse">Caisse</TabsTrigger>}
               {(capabilities.viewAll || capabilities.manageAccounting) && <TabsTrigger value="comptabilite">Comptabilité</TabsTrigger>}
@@ -570,116 +624,197 @@ export default function OrganisationDashboard() {
 
         {isRestaurant && (
           <>
-          <TabsContent value="restaurant" className="space-y-4">
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <div>
-                  <Label>Nom du restaurant</Label>
-                  <Input
-                    value={restaurantForm.name}
-                    onChange={(e) => setRestaurantForm({ ...restaurantForm, name: e.target.value })}
-                    disabled={!isPdg}
-                  />
-                </div>
-                <div>
-                  <Label>Localisation</Label>
-                  <Input
-                    value={restaurantForm.location}
-                    onChange={(e) => setRestaurantForm({ ...restaurantForm, location: e.target.value })}
-                    disabled={!isPdg}
-                  />
-                </div>
-                <div className="space-y-3 rounded-xl border p-4">
-                  <Label>Coordonnées GPS du restaurant</Label>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Input inputMode="decimal" value={restaurantForm.latitude} onChange={(e) => setRestaurantForm({ ...restaurantForm, latitude: e.target.value })} placeholder="Latitude, ex. 12.3714" disabled={!isPdg} />
-                    <Input inputMode="decimal" value={restaurantForm.longitude} onChange={(e) => setRestaurantForm({ ...restaurantForm, longitude: e.target.value })} placeholder="Longitude, ex. -1.5197" disabled={!isPdg} />
-                  </div>
-                  {isPdg && <Button type="button" variant="outline" className="w-full gap-2" onClick={captureRestaurantLocation} disabled={restaurantLocating}>{restaurantLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}{restaurantLocating ? "Recherche de la position..." : "Utiliser ma position GPS"}</Button>}
-                  {restaurantForm.latitude && restaurantForm.longitude && <p className="flex items-center gap-2 text-sm text-green-700"><MapPin className="h-4 w-4" /> Position prête à être enregistrée.</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+            <TabsContent value="restaurant" className="space-y-4">
+              <Card>
+                <CardContent className="p-6 space-y-4">
                   <div>
-                    <Label>Horaires</Label>
+                    <Label>Nom du restaurant</Label>
                     <Input
-                      value={restaurantForm.hours}
-                      onChange={(e) => setRestaurantForm({ ...restaurantForm, hours: e.target.value })}
+                      value={restaurantForm.name}
+                      onChange={(e) => setRestaurantForm({ ...restaurantForm, name: e.target.value })}
                       disabled={!isPdg}
                     />
                   </div>
                   <div>
-                    <Label>Téléphone</Label>
+                    <Label>Localisation</Label>
                     <Input
-                      value={restaurantForm.telephone}
-                      onChange={(e) => setRestaurantForm({ ...restaurantForm, telephone: e.target.value })}
+                      value={restaurantForm.location}
+                      onChange={(e) => setRestaurantForm({ ...restaurantForm, location: e.target.value })}
                       disabled={!isPdg}
                     />
                   </div>
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Input
-                    value={restaurantForm.description}
-                    onChange={(e) => setRestaurantForm({ ...restaurantForm, description: e.target.value })}
-                    disabled={!isPdg}
-                  />
-                </div>
-                {isPdg && (
-                  <div>
-                    <Label>Photo du restaurant</Label>
-                    {restaurantImagePreview ? (
-                      <div className="relative mt-2 w-40">
-                        <img src={restaurantImagePreview} alt="Aperçu restaurant" className="w-40 h-28 object-cover rounded-lg border" />
-                        <button
-                          type="button"
-                          onClick={() => { setRestaurantImageFile(null); setRestaurantImagePreview(null); setRestaurantForm({ ...restaurantForm, image_url: "" }); }}
-                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="mt-2 flex flex-col items-center justify-center w-40 h-28 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50">
-                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground mt-1">Téléverser</span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={selectRestaurantImage} />
-                      </label>
-                    )}
+                  <div className="space-y-3 rounded-xl border p-4">
+                    <Label>Coordonnées GPS du restaurant</Label>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Input inputMode="decimal" value={restaurantForm.latitude} onChange={(e) => setRestaurantForm({ ...restaurantForm, latitude: e.target.value })} placeholder="Latitude, ex. 12.3714" disabled={!isPdg} />
+                      <Input inputMode="decimal" value={restaurantForm.longitude} onChange={(e) => setRestaurantForm({ ...restaurantForm, longitude: e.target.value })} placeholder="Longitude, ex. -1.5197" disabled={!isPdg} />
+                    </div>
+                    {isPdg && <Button type="button" variant="outline" className="w-full gap-2" onClick={captureRestaurantLocation} disabled={restaurantLocating}>{restaurantLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}{restaurantLocating ? "Recherche de la position..." : "Utiliser ma position GPS"}</Button>}
+                    {restaurantForm.latitude && restaurantForm.longitude && <p className="flex items-center gap-2 text-sm text-green-700"><MapPin className="h-4 w-4" /> Position prête à être enregistrée.</p>}
                   </div>
-                )}
-                {isPdg && (
-                  <Button onClick={() => void submitRestaurantProfile()} disabled={submitting}>
-                    {submitting ? "Enregistrement..." : "Enregistrer la fiche"}
-                  </Button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Horaires</Label>
+                      <Input
+                        value={restaurantForm.hours}
+                        onChange={(e) => setRestaurantForm({ ...restaurantForm, hours: e.target.value })}
+                        disabled={!isPdg}
+                      />
+                    </div>
+                    <div>
+                      <Label>Téléphone</Label>
+                      <Input
+                        value={restaurantForm.telephone}
+                        onChange={(e) => setRestaurantForm({ ...restaurantForm, telephone: e.target.value })}
+                        disabled={!isPdg}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Description</Label>
+                    <Input
+                      value={restaurantForm.description}
+                      onChange={(e) => setRestaurantForm({ ...restaurantForm, description: e.target.value })}
+                      disabled={!isPdg}
+                    />
+                  </div>
+                  {isPdg && (
+                    <div>
+                      <Label>Photo du restaurant</Label>
+                      {restaurantImagePreview ? (
+                        <div className="relative mt-2 w-40">
+                          <img src={restaurantImagePreview} alt="Aperçu restaurant" className="w-40 h-28 object-cover rounded-lg border" />
+                          <button
+                            type="button"
+                            onClick={() => { setRestaurantImageFile(null); setRestaurantImagePreview(null); setRestaurantForm({ ...restaurantForm, image_url: "" }); }}
+                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="mt-2 flex flex-col items-center justify-center w-40 h-28 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50">
+                          <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground mt-1">Téléverser</span>
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={selectRestaurantImage} />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  {isPdg && (
+                    <Button onClick={() => void submitRestaurantProfile()} disabled={submitting}>
+                      {submitting ? "Enregistrement..." : "Enregistrer la fiche"}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+<TabsContent value="precommandes" className="space-y-4">
+  <Card>
+    <CardHeader>
+      <CardTitle>Précommandes à confirmer</CardTitle>
+    </CardHeader>
+
+    <CardContent className="space-y-4">
+      {restaurantOrders.filter(
+        (order) =>
+          order.restaurant_confirmation_status === "pending"
+      ).length === 0 ? (
+        <p className="py-6 text-center text-muted-foreground">
+          Aucune précommande en attente.
+        </p>
+      ) : (
+        restaurantOrders
+          .filter(
+            (order) =>
+              order.restaurant_confirmation_status === "pending"
+          )
+          .map((order) => (
+            <Card key={order.id}>
+              <CardContent className="space-y-3 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-lg font-bold">
+                    Ticket N° {order.queue_number || "—"}
+                  </p>
+
+                  <Badge variant="secondary">
+                    En attente de confirmation
+                  </Badge>
+                </div>
+
+                <p>
+                  <strong>Client :</strong>{" "}
+                  {order.customer_name || "Non renseigné"}
+                </p>
+
+                <p>
+                  <strong>Téléphone :</strong>{" "}
+                  {order.telephone || "Non renseigné"}
+                </p>
+
+                <p>
+                  <strong>Adresse :</strong>{" "}
+                  {order.address || "Non renseignée"}
+                </p>
+
+                <p>
+                  <strong>Total :</strong>{" "}
+                  {Number(order.total || 0).toLocaleString("fr-FR")} FCFA
+                </p>
+
+                {capabilities.manageOrders && (
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    <Button
+                      onClick={() =>
+                        void respondToPreorder(order.id, true)
+                      }
+                      disabled={respondingPreorderId === order.id}
+                    >
+                      Accepter les plats
+                    </Button>
+
+                    <Button
+                      variant="destructive"
+                      onClick={() =>
+                        void respondToPreorder(order.id, false)
+                      }
+                      disabled={respondingPreorderId === order.id}
+                    >
+                      Refuser
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          ))
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
+            <TabsContent value="commandes" className="space-y-4">
+              <Card><CardHeader><CardTitle>Commandes du restaurant</CardTitle></CardHeader><CardContent className="p-0 overflow-x-auto">
+                <Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Client</TableHead><TableHead>Montant</TableHead><TableHead>Moyen</TableHead><TableHead>Paiement</TableHead><TableHead>Livraison</TableHead><TableHead>Préparation</TableHead></TableRow></TableHeader>
+                  <TableBody>{restaurantOrders.map((order) => <TableRow key={order.id}>
+                    <TableCell>{new Date(order.created_at).toLocaleString("fr-FR")}</TableCell><TableCell>{order.customer_name || "—"}<div className="text-xs text-muted-foreground">{order.telephone}</div></TableCell>
+                    <TableCell className="font-medium">{Number(order.total || 0).toLocaleString()} FCFA</TableCell><TableCell>{order.payment_method || "—"}</TableCell><TableCell>{capabilities.managePayments ? <select className="h-9 rounded-md border bg-background px-2" value={order.payment_status || "pending"} onChange={(e) => void updatePaymentStatus(order.id, e.target.value)}><option value="pending">En attente</option><option value="confirmed">Confirmé</option><option value="rejected">Refusé</option></select> : <Badge variant={order.payment_status === "confirmed" ? "default" : "secondary"}>{order.payment_status || "pending"}</Badge>}</TableCell><TableCell>{capabilities.manageDelivery ? <select className="h-9 rounded-md border bg-background px-2" disabled={order.delivery_status === "delivered"} value={order.delivery_status || "pending"} onChange={(e) => void updateDeliveryStatus(order.id, e.target.value)}><option value="pending">À affecter</option><option value="assigned">Affectée</option><option value="picked_up">Récupérée</option><option value="on_the_way">En route</option><option value="delivered">Livrée</option><option value="cancelled">Annulée</option></select> : <Badge variant={order.delivery_status === "delivered" ? "default" : "secondary"}>{order.delivery_status || "pending"}</Badge>}</TableCell>
+                    <TableCell>{capabilities.manageOrders ? <select className="h-9 rounded-md border bg-background px-2" disabled={order.delivery_status === "delivered" || order.status === "completed"} value={order.status || "pending"} onChange={(e) => void updateOrderStatus(order.id, e.target.value)}><option value="pending">En attente</option><option value="confirmed">Confirmée</option><option value="preparing">En préparation</option><option value="ready">Prête</option><option value="completed">Terminée</option><option value="cancelled">Annulée</option></select> : <Badge>{order.status || "pending"}</Badge>}</TableCell>
+                  </TableRow>)}{restaurantOrders.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Aucune commande</TableCell></TableRow>}</TableBody>
+                </Table>
+              </CardContent></Card>
+            </TabsContent>
 
-          <TabsContent value="commandes" className="space-y-4">
-            <Card><CardHeader><CardTitle>Commandes du restaurant</CardTitle></CardHeader><CardContent className="p-0 overflow-x-auto">
-              <Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Client</TableHead><TableHead>Montant</TableHead><TableHead>Moyen</TableHead><TableHead>Paiement</TableHead><TableHead>Livraison</TableHead><TableHead>Préparation</TableHead></TableRow></TableHeader>
-                <TableBody>{restaurantOrders.map((order) => <TableRow key={order.id}>
-                  <TableCell>{new Date(order.created_at).toLocaleString("fr-FR")}</TableCell><TableCell>{order.customer_name || "—"}<div className="text-xs text-muted-foreground">{order.telephone}</div></TableCell>
-                  <TableCell className="font-medium">{Number(order.total || 0).toLocaleString()} FCFA</TableCell><TableCell>{order.payment_method || "—"}</TableCell><TableCell>{capabilities.managePayments ? <select className="h-9 rounded-md border bg-background px-2" value={order.payment_status || "pending"} onChange={(e) => void updatePaymentStatus(order.id, e.target.value)}><option value="pending">En attente</option><option value="confirmed">Confirmé</option><option value="rejected">Refusé</option></select> : <Badge variant={order.payment_status === "confirmed" ? "default" : "secondary"}>{order.payment_status || "pending"}</Badge>}</TableCell><TableCell>{capabilities.manageDelivery ? <select className="h-9 rounded-md border bg-background px-2" value={order.delivery_status || "pending"} onChange={(e) => void updateDeliveryStatus(order.id, e.target.value)}><option value="pending">À affecter</option><option value="assigned">Affectée</option><option value="picked_up">Récupérée</option><option value="on_the_way">En route</option><option value="delivered">Livrée</option><option value="cancelled">Annulée</option></select> : <Badge variant={order.delivery_status === "delivered" ? "default" : "secondary"}>{order.delivery_status || "pending"}</Badge>}</TableCell>
-                  <TableCell>{capabilities.manageOrders ? <select className="h-9 rounded-md border bg-background px-2" value={order.status || "pending"} onChange={(e) => void updateOrderStatus(order.id, e.target.value)}><option value="pending">En attente</option><option value="confirmed">Confirmée</option><option value="preparing">En préparation</option><option value="ready">Prête</option><option value="completed">Terminée</option><option value="cancelled">Annulée</option></select> : <Badge>{order.status || "pending"}</Badge>}</TableCell>
-                </TableRow>)}{restaurantOrders.length === 0 && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">Aucune commande</TableCell></TableRow>}</TableBody>
-              </Table>
-            </CardContent></Card>
-          </TabsContent>
+            {capabilities.manageCash && <TabsContent value="caisse" className="space-y-4">
+              <Card><CardHeader><CardTitle><Wallet className="inline h-5 w-5 mr-2" />Caisse</CardTitle></CardHeader><CardContent className="space-y-4">
+                {openCashSession ? <><p>Caisse ouverte depuis {new Date(openCashSession.opened_at).toLocaleString("fr-FR")} — Fond initial : {Number(openCashSession.opening_balance).toLocaleString()} FCFA</p><div className="flex flex-col gap-3 sm:flex-row"><Input type="number" placeholder="Solde réellement compté" value={closingBalance} onChange={(e) => setClosingBalance(e.target.value)} /><Button className="shrink-0" onClick={() => void closeCash()}>Clôturer la caisse</Button></div></> : <><p className="text-muted-foreground">Aucune caisse ouverte.</p><div className="flex flex-col gap-3 sm:flex-row"><Input type="number" placeholder="Fond de caisse initial" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /><Button className="shrink-0" onClick={() => void openCash()}>Ouvrir la caisse</Button></div></>}
+              </CardContent></Card>
+              <Card className="min-w-0"><CardHeader><CardTitle>Historique des clôtures</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><Table><TableHeader><TableRow><TableHead>Ouverture</TableHead><TableHead>Statut</TableHead><TableHead>Attendu</TableHead><TableHead>Compté</TableHead><TableHead>Écart</TableHead></TableRow></TableHeader><TableBody>{cashSessions.map((session) => <TableRow key={session.id}><TableCell>{new Date(session.opened_at).toLocaleString("fr-FR")}</TableCell><TableCell><Badge variant={session.status === "open" ? "default" : "secondary"}>{session.status === "open" ? "Ouverte" : "Clôturée"}</Badge></TableCell><TableCell>{Number(session.expected_balance || 0).toLocaleString()} F</TableCell><TableCell>{Number(session.closing_balance || 0).toLocaleString()} F</TableCell><TableCell>{Number(session.variance || 0).toLocaleString()} F</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
+            </TabsContent>}
 
-          {capabilities.manageCash && <TabsContent value="caisse" className="space-y-4">
-            <Card><CardHeader><CardTitle><Wallet className="inline h-5 w-5 mr-2" />Caisse</CardTitle></CardHeader><CardContent className="space-y-4">
-              {openCashSession ? <><p>Caisse ouverte depuis {new Date(openCashSession.opened_at).toLocaleString("fr-FR")} — Fond initial : {Number(openCashSession.opening_balance).toLocaleString()} FCFA</p><div className="flex flex-col gap-3 sm:flex-row"><Input type="number" placeholder="Solde réellement compté" value={closingBalance} onChange={(e) => setClosingBalance(e.target.value)} /><Button className="shrink-0" onClick={() => void closeCash()}>Clôturer la caisse</Button></div></> : <><p className="text-muted-foreground">Aucune caisse ouverte.</p><div className="flex flex-col gap-3 sm:flex-row"><Input type="number" placeholder="Fond de caisse initial" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} /><Button className="shrink-0" onClick={() => void openCash()}>Ouvrir la caisse</Button></div></>}
-            </CardContent></Card>
-            <Card className="min-w-0"><CardHeader><CardTitle>Historique des clôtures</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><Table><TableHeader><TableRow><TableHead>Ouverture</TableHead><TableHead>Statut</TableHead><TableHead>Attendu</TableHead><TableHead>Compté</TableHead><TableHead>Écart</TableHead></TableRow></TableHeader><TableBody>{cashSessions.map((session) => <TableRow key={session.id}><TableCell>{new Date(session.opened_at).toLocaleString("fr-FR")}</TableCell><TableCell><Badge variant={session.status === "open" ? "default" : "secondary"}>{session.status === "open" ? "Ouverte" : "Clôturée"}</Badge></TableCell><TableCell>{Number(session.expected_balance || 0).toLocaleString()} F</TableCell><TableCell>{Number(session.closing_balance || 0).toLocaleString()} F</TableCell><TableCell>{Number(session.variance || 0).toLocaleString()} F</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
-          </TabsContent>}
-
-          {(capabilities.viewAll || capabilities.manageAccounting) && <TabsContent value="comptabilite" className="space-y-4">
-            <div className="grid md:grid-cols-3 gap-4"><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Recettes</p><p className="text-2xl font-bold text-green-600">{totalIncome.toLocaleString()} F</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Dépenses</p><p className="text-2xl font-bold text-red-600">{totalExpenses.toLocaleString()} F</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Résultat</p><p className="text-2xl font-bold">{(totalIncome - totalExpenses).toLocaleString()} F</p></CardContent></Card></div>
-            {capabilities.manageAccounting && <Card><CardHeader><CardTitle>Nouvelle écriture</CardTitle></CardHeader><CardContent className="grid md:grid-cols-5 gap-3"><select className="h-10 rounded-md border bg-background px-3" value={financeForm.entry_type} onChange={(e) => setFinanceForm({ ...financeForm, entry_type: e.target.value })}><option value="expense">Dépense</option><option value="income">Recette</option></select><Input placeholder="Catégorie" value={financeForm.category} onChange={(e) => setFinanceForm({ ...financeForm, category: e.target.value })} /><Input type="number" placeholder="Montant" value={financeForm.amount} onChange={(e) => setFinanceForm({ ...financeForm, amount: e.target.value })} /><select className="h-10 rounded-md border bg-background px-3" value={financeForm.payment_method} onChange={(e) => setFinanceForm({ ...financeForm, payment_method: e.target.value })}><option value="cash">Espèces</option><option value="wave">Wave</option><option value="orange_money">Orange Money</option><option value="bank">Banque</option></select><Button onClick={() => void recordFinancialEntry()}>Enregistrer</Button></CardContent></Card>}
-            <Card className="min-w-0"><CardHeader><CardTitle>Journal financier</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Catégorie</TableHead><TableHead>Paiement</TableHead><TableHead>Montant</TableHead></TableRow></TableHeader><TableBody>{financialEntries.map((entry) => <TableRow key={entry.id}><TableCell>{new Date(entry.occurred_at).toLocaleString("fr-FR")}</TableCell><TableCell>{entry.entry_type === "income" ? "Recette" : "Dépense"}</TableCell><TableCell>{entry.category}</TableCell><TableCell>{entry.payment_method || "—"}</TableCell><TableCell className={entry.entry_type === "income" ? "text-green-600 font-medium" : "text-red-600 font-medium"}>{entry.entry_type === "income" ? "+" : "-"}{Number(entry.amount).toLocaleString()} F</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
-          </TabsContent>}
+            {(capabilities.viewAll || capabilities.manageAccounting) && <TabsContent value="comptabilite" className="space-y-4">
+              <div className="grid md:grid-cols-3 gap-4"><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Recettes</p><p className="text-2xl font-bold text-green-600">{totalIncome.toLocaleString()} F</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Dépenses</p><p className="text-2xl font-bold text-red-600">{totalExpenses.toLocaleString()} F</p></CardContent></Card><Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Résultat</p><p className="text-2xl font-bold">{(totalIncome - totalExpenses).toLocaleString()} F</p></CardContent></Card></div>
+              {capabilities.manageAccounting && <Card><CardHeader><CardTitle>Nouvelle écriture</CardTitle></CardHeader><CardContent className="grid md:grid-cols-5 gap-3"><select className="h-10 rounded-md border bg-background px-3" value={financeForm.entry_type} onChange={(e) => setFinanceForm({ ...financeForm, entry_type: e.target.value })}><option value="expense">Dépense</option><option value="income">Recette</option></select><Input placeholder="Catégorie" value={financeForm.category} onChange={(e) => setFinanceForm({ ...financeForm, category: e.target.value })} /><Input type="number" placeholder="Montant" value={financeForm.amount} onChange={(e) => setFinanceForm({ ...financeForm, amount: e.target.value })} /><select className="h-10 rounded-md border bg-background px-3" value={financeForm.payment_method} onChange={(e) => setFinanceForm({ ...financeForm, payment_method: e.target.value })}><option value="cash">Espèces</option><option value="wave">Wave</option><option value="orange_money">Orange Money</option><option value="bank">Banque</option></select><Button onClick={() => void recordFinancialEntry()}>Enregistrer</Button></CardContent></Card>}
+              <Card className="min-w-0"><CardHeader><CardTitle>Journal financier</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Catégorie</TableHead><TableHead>Paiement</TableHead><TableHead>Montant</TableHead></TableRow></TableHeader><TableBody>{financialEntries.map((entry) => <TableRow key={entry.id}><TableCell>{new Date(entry.occurred_at).toLocaleString("fr-FR")}</TableCell><TableCell>{entry.entry_type === "income" ? "Recette" : "Dépense"}</TableCell><TableCell>{entry.category}</TableCell><TableCell>{entry.payment_method || "—"}</TableCell><TableCell className={entry.entry_type === "income" ? "text-green-600 font-medium" : "text-red-600 font-medium"}>{entry.entry_type === "income" ? "+" : "-"}{Number(entry.amount).toLocaleString()} F</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
+            </TabsContent>}
           </>
         )}
 
@@ -749,128 +884,128 @@ export default function OrganisationDashboard() {
         )}
 
         {!isRestaurant && (
-        <>
-        <TabsContent value="magasins" className="space-y-4">
-          {isPdg && (
-            <div className="flex justify-end">
-              <Button onClick={() => openWarehouseDialog()}>
-                <Plus className="h-4 w-4 mr-2" /> Ajouter un magasin
-              </Button>
-            </div>
-          )}
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Adresse</TableHead>
-                    <TableHead>Coordonnées GPS</TableHead>
-                    <TableHead>Statut</TableHead>
-                    {isPdg && <TableHead>Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {warehouses.map((w) => (
-                    <TableRow key={w.id}>
-                      <TableCell className="font-medium">{w.name}</TableCell>
-                      <TableCell>{w.address || "—"}</TableCell>
-                      <TableCell>
-                        {w.latitude && w.longitude ? `${w.latitude}, ${w.longitude}` : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={w.actif ? "default" : "secondary"}>{w.actif ? "Actif" : "Inactif"}</Badge>
-                      </TableCell>
-                      {isPdg && (
-                        <TableCell>
-                          <Button size="sm" variant="ghost" onClick={() => openWarehouseDialog(w)}>Modifier</Button>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                  {warehouses.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        Aucun magasin enregistré
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="produits" className="space-y-4">
-          {isPdg && (
-            <div className="flex justify-end">
-              <Button onClick={() => openProductDialog()}>
-                <Plus className="h-4 w-4 mr-2" /> Ajouter un produit
-              </Button>
-            </div>
-          )}
-          <Card>
-            <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Produit</TableHead>
-                    <TableHead>Prix</TableHead>
-                    {warehouses.map((w) => (
-                      <TableHead key={w.id}>{w.name}</TableHead>
-                    ))}
-                    {isPdg && <TableHead>Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        {p.image ? (
-                          <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded-md border" />
-                        ) : (
-                          <div className="w-12 h-12 flex items-center justify-center rounded-md border bg-muted text-muted-foreground">
-                            <ImageIcon className="h-5 w-5" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell>{p.price} FCFA</TableCell>
+          <>
+            <TabsContent value="magasins" className="space-y-4">
+              {isPdg && (
+                <div className="flex justify-end">
+                  <Button onClick={() => openWarehouseDialog()}>
+                    <Plus className="h-4 w-4 mr-2" /> Ajouter un magasin
+                  </Button>
+                </div>
+              )}
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nom</TableHead>
+                        <TableHead>Adresse</TableHead>
+                        <TableHead>Coordonnées GPS</TableHead>
+                        <TableHead>Statut</TableHead>
+                        {isPdg && <TableHead>Actions</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {warehouses.map((w) => (
-                        <TableCell key={w.id}>
-                          {isPdg ? (
-                            <Input
-                              type="number"
-                              className="w-24"
-                              defaultValue={stockFor(w.id, p.id)}
-                              onBlur={(e) => void updateStock(w.id, p.id, e.target.value)}
-                            />
-                          ) : (
-                            stockFor(w.id, p.id)
+                        <TableRow key={w.id}>
+                          <TableCell className="font-medium">{w.name}</TableCell>
+                          <TableCell>{w.address || "—"}</TableCell>
+                          <TableCell>
+                            {w.latitude && w.longitude ? `${w.latitude}, ${w.longitude}` : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={w.actif ? "default" : "secondary"}>{w.actif ? "Actif" : "Inactif"}</Badge>
+                          </TableCell>
+                          {isPdg && (
+                            <TableCell>
+                              <Button size="sm" variant="ghost" onClick={() => openWarehouseDialog(w)}>Modifier</Button>
+                            </TableCell>
                           )}
-                        </TableCell>
+                        </TableRow>
                       ))}
-                      {isPdg && (
-                        <TableCell>
-                          <Button size="sm" variant="ghost" onClick={() => openProductDialog(p)}>Modifier</Button>
-                        </TableCell>
+                      {warehouses.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            Aucun magasin enregistré
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableRow>
-                  ))}
-                  {products.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4 + warehouses.length} className="text-center text-muted-foreground py-8">
-                        Aucun produit enregistré
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        </>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="produits" className="space-y-4">
+              {isPdg && (
+                <div className="flex justify-end">
+                  <Button onClick={() => openProductDialog()}>
+                    <Plus className="h-4 w-4 mr-2" /> Ajouter un produit
+                  </Button>
+                </div>
+              )}
+              <Card>
+                <CardContent className="p-0 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Image</TableHead>
+                        <TableHead>Produit</TableHead>
+                        <TableHead>Prix</TableHead>
+                        {warehouses.map((w) => (
+                          <TableHead key={w.id}>{w.name}</TableHead>
+                        ))}
+                        {isPdg && <TableHead>Actions</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {products.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded-md border" />
+                            ) : (
+                              <div className="w-12 h-12 flex items-center justify-center rounded-md border bg-muted text-muted-foreground">
+                                <ImageIcon className="h-5 w-5" />
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell>{p.price} FCFA</TableCell>
+                          {warehouses.map((w) => (
+                            <TableCell key={w.id}>
+                              {isPdg ? (
+                                <Input
+                                  type="number"
+                                  className="w-24"
+                                  defaultValue={stockFor(w.id, p.id)}
+                                  onBlur={(e) => void updateStock(w.id, p.id, e.target.value)}
+                                />
+                              ) : (
+                                stockFor(w.id, p.id)
+                              )}
+                            </TableCell>
+                          ))}
+                          {isPdg && (
+                            <TableCell>
+                              <Button size="sm" variant="ghost" onClick={() => openProductDialog(p)}>Modifier</Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                      {products.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={4 + warehouses.length} className="text-center text-muted-foreground py-8">
+                            Aucun produit enregistré
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </>
         )}
 
         {isPdg && isRestaurant && (

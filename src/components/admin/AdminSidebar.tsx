@@ -14,6 +14,7 @@ import {
   UtensilsCrossed,
   Factory,
   ClipboardList,
+  UserMinus,
   ImageIcon,
   KeyRound,
   Percent,
@@ -39,6 +40,7 @@ const menuItems = [
   { path: "/admin/commissions-promo", label: "Commissions codes promo", icon: Percent },
   { path: "/admin/service-requests", label: "Demandes de services", icon: Wrench },
   { path: "/admin/orders", label: "Commandes", icon: Package },
+  { path: "/admin/livreurs", label: "Gestion des livreurs", icon: Users },
   { path: "/admin/demandes-partenaires", label: "Demandes partenaires", icon: ClipboardList },
   { path: "/admin/liquidation", label: "Liquidation", icon: Package },
   { path: "/admin/slides-accueil", label: "Slides accueil", icon: ImageIcon },
@@ -49,6 +51,7 @@ const menuItems = [
   { path: "/admin/repertoire-partenaires", label: "Répertoire partenaires", icon: ClipboardList },
   { path: "/admin/voyages", label: "Voyages & Courriers", icon: Bus },
   { path: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
+  { path: "/admin/demandes-suppression", label: "Demandes de suppression", icon: UserMinus, permission: "request_account_deletion" },
 ];
 
 const AdminSidebar = () => {

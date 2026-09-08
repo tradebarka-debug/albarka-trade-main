@@ -24,8 +24,8 @@ const Suppliers = () => {
       setLoading(true);
       const countryId = Number(localStorage.getItem("country_id")) || 1;
       const [{ data: suppliersData, error: suppliersError }, { data: productsData, error: productsError }] = await Promise.all([
-        suppliersTable.select("id, company_name, category, country, description, logo, certified, scope, country_id").eq("status", "active").or(`country_id.eq.${countryId},scope.eq.international`),
-        (supabase.from("supplier_products") as any).select("id, supplier_id").eq("country_id", countryId),
+        suppliersTable.select("id, company_name, category, country, description, logo, certified, scope, country_id").eq("status", "active").or(`country_id.eq.${countryId},visibility.eq.international`),
+        (supabase.from("supplier_products") as any).select("id, supplier_id"),
       ]);
 
       if (suppliersError) console.error("Impossible de charger les fournisseurs", suppliersError);

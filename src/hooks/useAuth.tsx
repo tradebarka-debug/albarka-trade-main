@@ -28,7 +28,7 @@ type AuthDetails = {
   isInternalOrganization: boolean;
 };
 
-const businessRoles = new Set(['admin', 'restaurant', 'alimentaire', 'livreur']);
+const businessRoles = new Set(['admin']);
 const managementRoleCodes = new Set([
   'general_management',
   'directeur_general',
@@ -134,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .filter(Boolean)
       .forEach((permission: string) => permissions.add(permission));
 
-    if (businessRoles.has(profileRole ?? '') || isManagement || hasManagedRoles) {
+    if (businessRoles.has(profileRole ?? '') || isManagement) {
       permissions.add('access_admin');
     }
 
@@ -152,7 +152,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         permissions.add(permission);
       });
     }
-
+    if (profileRole === 'livreur' || normalizedRoleCode === 'delivery_driver') {
+      permissions.delete('access_admin');
+      permissions.delete('create_users');
+      permissions.delete('manage_team_accounts');
+    }
     return {
       isAdmin:
         roles?.some((item) => item.role === 'admin') ||
@@ -265,10 +269,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // d'une organisation partenaire (fournisseur/restaurant/usine) est
         // exclu meme s'il a un organizationRoleCode ou des permissions.
         canAccessAdmin:
-          isAdmin ||
-          isTransportPDG ||
-          (isInternalOrganization &&
-            (Boolean(organizationRoleCode) || permissionCodes.includes('access_admin'))),
+  isAdmin ||
+  isTransportPDG ||
+  (isInternalOrganization && permissionCodes.includes('access_admin')),
         hasPermission,
         isLoading,
         signIn,

@@ -41,6 +41,13 @@ const AdminLayout = () => {
     );
   }
 
+  const isDeletionRequestsPage = location.pathname.startsWith("/admin/demandes-suppression");
+  if (isDeletionRequestsPage && !hasPermission("request_account_deletion") && !hasPermission("review_account_deletions")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center"><div className="text-center"><h1 className="text-2xl font-bold text-destructive mb-2">Permission insuffisante</h1><p className="text-muted-foreground">Seuls le PDG/Admin Albarka et le Directeur marketing accèdent aux demandes partenaires.</p></div></div>
+    );
+  }
+
   const restrictedAdminRoutes = [
     { prefix: "/admin/restaurants", permission: "manage_restaurants" },
     { prefix: "/admin/menus", permission: "manage_restaurants" },

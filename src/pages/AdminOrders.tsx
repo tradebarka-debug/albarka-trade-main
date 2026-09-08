@@ -42,12 +42,12 @@ const AdminOrders = () => {
 
   const saveDelivery = async (order: any, markDelivered = false) => {
     const draft = drafts[order.id];
-    const deliveryStatus = (markDelivered ? "delivered" : draft.delivery_status) as DeliveryStatus;
+    const deliveryStatus = (order.delivery_status === "delivered" ? "delivered" : markDelivered ? "delivered" : draft.delivery_status) as DeliveryStatus;
     const { error } = await (supabase as any).from("orders").update({
       courier_name: draft.courier_name || null, courier_phone: draft.courier_phone || null,
       delivery_distance_km: draft.delivery_distance_km === "" ? null : Number(draft.delivery_distance_km),
       delivery_fee: Number(draft.delivery_fee || 0), delivery_notes: draft.delivery_notes || null,
-      delivery_status: deliveryStatus, delivery_completed_at: deliveryStatus === "delivered" ? new Date().toISOString() : null,
+      delivery_status: deliveryStatus, delivery_completed_at: deliveryStatus === "delivered" ? order.delivery_completed_at || new Date().toISOString() : null,
     }).eq("id", order.id);
     if (error) { toast.error("La livraison n'a pas pu être enregistrée."); return; }
     toast.success(markDelivered ? "Livraison marquée comme terminée." : "Informations de livraison enregistrées.");
@@ -81,7 +81,7 @@ const AdminOrders = () => {
             <div><Label>Téléphone livreur</Label><Input className="mt-1" value={draft.courier_phone || ""} onChange={(e) => updateDraft(order.id, "courier_phone", e.target.value)} placeholder="Ex. +226 ..." /></div>
             <div><Label>Distance (km)</Label><Input className="mt-1" type="number" min="0" step="0.1" value={draft.delivery_distance_km || ""} onChange={(e) => updateDraft(order.id, "delivery_distance_km", e.target.value)} placeholder="À calculer" /></div>
             <div><Label>Tarif livraison (FCFA)</Label><Input className="mt-1" type="number" min="0" value={draft.delivery_fee || "0"} onChange={(e) => updateDraft(order.id, "delivery_fee", e.target.value)} /></div>
-            <div className="md:col-span-2"><Label>Statut de livraison</Label><select className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.delivery_status || "pending"} onChange={(e) => updateDraft(order.id, "delivery_status", e.target.value)}>{(Object.keys(deliveryLabels) as DeliveryStatus[]).map((status) => <option key={status} value={status}>{deliveryLabels[status]}</option>)}</select></div>
+            <div className="md:col-span-2"><Label>Statut de livraison</Label><select className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" disabled={deliveryStatus === "delivered"} value={draft.delivery_status || "pending"} onChange={(e) => updateDraft(order.id, "delivery_status", e.target.value)}>{(Object.keys(deliveryLabels) as DeliveryStatus[]).map((status) => <option key={status} value={status}>{deliveryLabels[status]}</option>)}</select></div>
             <div className="md:col-span-2"><Label>Note de suivi</Label><Input className="mt-1" value={draft.delivery_notes || ""} onChange={(e) => updateDraft(order.id, "delivery_notes", e.target.value)} placeholder="Ex. client appelé, arrivée prévue à 14 h" /></div>
           </div>
           <div className="flex flex-wrap gap-3 mt-5"><Button onClick={() => saveDelivery(order)} className="gap-2"><Truck className="w-4 h-4" />Enregistrer le suivi</Button>{deliveryStatus !== "delivered" && <Button variant="outline" onClick={() => saveDelivery(order, true)} className="gap-2"><PackageCheck className="w-4 h-4" />Livraison terminée</Button>}</div>

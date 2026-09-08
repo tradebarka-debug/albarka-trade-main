@@ -12,6 +12,9 @@ import Index from "./pages/Index";
 import Boutique from "./pages/Boutique";
 import AdminOrders from "@/pages/AdminOrders";
 import AdminSuppliers from "./pages/admin/AdminSuppliers";
+import AdminDrivers from "./pages/admin/AdminDrivers";
+import DriverDashboard from "./pages/DriverDashboard";
+import RestaurantDashboard from "./pages/RestaurantDashboard";
 import AdminFactories from "./pages/admin/AdminFactories";
 import AdminFactoryProducts from "./pages/admin/AdminFactoryProducts";
 import AdminSupplierProducts from "./pages/admin/AdminSupplierProducts";
@@ -89,6 +92,7 @@ import AdminServiceRequests from "./pages/admin/AdminServiceRequests";
 import AdminPartnerApplications from "./pages/admin/AdminPartnerApplications";
 import OrganisationDashboard from "./pages/organisation/OrganisationDashboard";
 import AdminPromoCommissions from "./pages/admin/AdminPromoCommissions";
+import AdminDeletionRequests from "./pages/admin/AdminDeletionRequests";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -123,9 +127,11 @@ const App = () => (
                 <Route path="voyages" element={<AdminVoyages />} />
                 <Route path="liquidation" element={<AdminLiquidation />} />
                 <Route path="utilisateurs" element={<AdminUsers />} />
+                <Route path="demandes-suppression" element={<AdminDeletionRequests />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="admin-partners" element={<AdminSuppliers />} />
                 <Route path="fournisseurs" element={<AdminSuppliers />} />
+                <Route path="livreurs" element={<AdminDrivers />} />
                 <Route path="fournisseurs/produits" element={<AdminSupplierProducts />} />
                 <Route path="usines" element={<AdminFactories />} />
                 <Route path="usines/produits" element={<AdminFactoryProducts />} />
@@ -204,6 +210,12 @@ const App = () => (
               <Route
                 path="/faq-representant"
                 element={<FAQRepresentant />}
+              />
+              <Route path="/espace-livreur" element={<DriverDashboard />}
+              />
+              <Route
+                path="/espace-restaurant"
+                element={<RestaurantDashboard />}
               />
               {/* Public routes - with Header/Footer */}
               <Route

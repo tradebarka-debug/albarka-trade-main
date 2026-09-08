@@ -102,10 +102,25 @@ export interface RestaurantOutlet {
 }
 
 export interface RestaurantOrder {
-  id: string; created_at: string; customer_name: string | null; telephone: string | null;
-  total: number | null; payment_method: string | null; payment_status: string; payment_confirmed_at: string | null; transaction_ref: string | null;
-  status: string | null; items: string | null; delivery_status: string; tracking_number: string | null;
+  id: string;
+  created_at: string;
+  customer_name: string | null;
+  telephone: string | null;
+  address: string | null;
+  total: number | null;
+  payment_method: string | null;
+  payment_status: string;
+  payment_confirmed_at: string | null;
+  payment_expires_at: string | null;
+  transaction_ref: string | null;
+  status: string | null;
+  items: string | null;
+  delivery_status: string;
+  tracking_number: string | null;
+  queue_number: number | null;
   requires_delivery: boolean;
+  restaurant_confirmation_status: string | null;
+  restaurant_rejection_reason: string | null;
 }
 
 export interface CashSession {
@@ -158,8 +173,17 @@ export function useOrganizationPortal() {
     });
 
     if (fnError || result?.error) {
-      setError(result?.error || (await getFunctionErrorMessage(fnError, "Erreur de chargement")));
-      setData(null);
+      const message =
+        result?.error ||
+        (await getFunctionErrorMessage(
+          fnError,
+          "Erreur de chargement"
+        ));
+
+      if (!silent) {
+        setError(message);
+        setData(null);
+      }
     } else {
       setError(null);
       setData(result as OrganizationDashboardData);

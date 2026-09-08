@@ -46,10 +46,13 @@ const AdminDashboard = () => {
       const countryId = Number(localStorage.getItem("country_id")) || 1;
       const [products, restaurants, suppliers, orders, partners] = await Promise.all([
         (supabase.from("products") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId),
-        (supabase.from("restaurant_partners") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId).eq("is_active", true),
-        (supabase.from("suppliers") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId).eq("status", "active"),
-        (supabase.from("orders") as any).select("total, delivery_status").eq("country_id", countryId),
-        (supabase.from("partner_applications") as any).select("id", { count: "exact", head: true }).eq("country_id", countryId).eq("status", "approved"),
+        (supabase.from("restaurant_partners") as any).select("id", { count: "exact", head: true }).eq("is_active", true),
+        (supabase.from("suppliers") as any)
+  .select("id", { count: "exact", head: true })
+  .eq("status", "active")
+  .or(`country_id.eq.${countryId},visibility.eq.international`),
+        (supabase.from("orders") as any).select("total, delivery_status"),
+       (supabase as any).from("partner_applications").select("id", { count: "exact", head: true }).eq("country_id", countryId).eq("status", "approved"),
       ]);
       const orderRows = orders.data || [];
       setMetrics({ products: products.count || 0, restaurants: restaurants.count || 0, suppliers: suppliers.count || 0, orders: orderRows.length, deliveries: orderRows.filter((order: any) => order.delivery_status === "delivered").length, revenue: orderRows.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0), partners: partners.count || 0 });
