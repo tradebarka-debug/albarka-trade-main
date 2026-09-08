@@ -136,12 +136,65 @@ export interface FinancialEntry {
 
 export interface OrganizationCapabilities {
   viewAll: boolean; manageOrders: boolean; managePayments: boolean; manageDelivery: boolean; manageCash: boolean; manageAccounting: boolean;
-  manageTeam: boolean; manageCatalog: boolean;
+  manageTeam: boolean; manageCatalog: boolean; manageLogistics: boolean;
+}
+
+export interface Truck {
+  id: number;
+  organization_id: number;
+  title: string;
+  vehicle_type: string | null;
+  brand: string | null;
+  model: string | null;
+  year_built: number | null;
+  registration_number: string | null;
+  registration_country: string | null;
+  registration_city: string | null;
+  condition: string | null;
+  availability_status: string;
+  axle_count: number | null;
+  wheel_count: number | null;
+  fuel_type: string | null;
+  transmission_type: string | null;
+  engine_power: string | null;
+  mileage_km: number | null;
+  payload_tons: number | null;
+  max_weight_kg: number | null;
+  length_m: number | null;
+  width_m: number | null;
+  height_m: number | null;
+  loading_volume_m3: number | null;
+  suspension_type: string | null;
+  has_air_conditioning: boolean;
+  has_gps: boolean;
+  tire_condition: string | null;
+  last_service_date: string | null;
+  next_inspection_date: string | null;
+  rental_with_driver: boolean | null;
+  daily_rate: number | null;
+  weekly_rate: number | null;
+  monthly_rate: number | null;
+  km_rate: number | null;
+  security_deposit: number | null;
+  available_from: string | null;
+  available_until: string | null;
+  has_registration_certificate: boolean;
+  has_insurance: boolean;
+  has_inspection_certificate: boolean;
+  has_tax_sticker: boolean;
+  has_driver_license: boolean;
+  has_transport_authorization: boolean;
+  has_customs_document: boolean;
+  image_urls: string[];
+  actif: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface OrganizationDashboardData {
   organization: Record<string, unknown> | null;
   warehouses: Warehouse[];
+  trucks: Truck[];
   products: OrganizationProduct[];
   employees: OrganizationEmployee[];
   roles: OrganizationRole[];

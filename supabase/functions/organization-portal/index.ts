@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
       manageAccounting: isPdg || ["manager", "accountant"].includes(normalizedRole),
       manageTeam: isPdg,
       manageCatalog: isPdg || normalizedRole === "manager",
+      manageLogistics: isPdg || normalizedRole === "manager",
     };
 
     const { action, ...params } = await req.json();
@@ -109,6 +110,7 @@ Deno.serve(async (req) => {
 
     const actionCapability: Record<string, keyof typeof capabilities> = {
       upsert_warehouse: "manageCatalog", delete_warehouse: "manageCatalog",
+      upsert_truck: "manageLogistics", delete_truck: "manageLogistics",
       upsert_product: "manageCatalog", delete_product: "manageCatalog", set_stock: "manageCatalog",
       upsert_restaurant_profile: "manageCatalog", upsert_menu_item: "manageCatalog", delete_menu_item: "manageCatalog",
       update_restaurant_order_status: "manageOrders",
@@ -126,7 +128,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "get_dashboard") {
-      const [orgResult, warehousesResult, productsResult, employeesResult, performanceResult, rolesResult, outletsResult] = await Promise.all([
+      const [orgResult, warehousesResult, productsResult, employeesResult, performanceResult, rolesResult, outletsResult, trucksResult] = await Promise.all([
         supabaseAdmin.from("organizations").select("*").eq("id", organizationId).maybeSingle(),
         supabaseAdmin.from("warehouses").select("*").eq("organization_id", organizationId).order("name"),
         supabaseAdmin.from("organization_products").select("*").eq("organization_id", organizationId).order("name"),
@@ -141,6 +143,7 @@ Deno.serve(async (req) => {
           .order("period_month", { ascending: false }),
         supabaseAdmin.from("organization_roles").select("id, name, code").eq("organization_id", organizationId),
         supabaseAdmin.from("restaurant_outlets").select("*").eq("organization_id", organizationId).order("is_primary", { ascending: false }).order("name"),
+        supabaseAdmin.from("trucks").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }),
       ]);
 
       if (orgResult.error) throw orgResult.error;
@@ -150,6 +153,7 @@ Deno.serve(async (req) => {
       if (performanceResult.error) throw performanceResult.error;
       if (rolesResult.error) throw rolesResult.error;
       if (outletsResult.error) throw outletsResult.error;
+      if (trucksResult.error) throw trucksResult.error;
 
       const roleById = new Map((rolesResult.data || []).map((r: any) => [Number(r.id), r]));
       const employees = (employeesResult.data || []).map((emp: any) => ({
@@ -221,6 +225,7 @@ Deno.serve(async (req) => {
           roles: rolesResult.data,
           outlets: outletsResult.data,
           warehouses: warehousesResult.data,
+          trucks: trucksResult.data,
           products: productsResult.data,
           employees: visibleEmployees,
           stock,
@@ -522,6 +527,93 @@ if (action === "respond_restaurant_preorder") {
       const { id } = params as any;
       const { error } = await supabaseAdmin
         .from("warehouses")
+        .delete()
+        .eq("id", id)
+        .eq("organization_id", organizationId);
+      if (error) throw error;
+      return jsonResponse({ success: true }, 200, corsHeaders);
+    }
+
+    if (action === "upsert_truck") {
+      const {
+        id, title, vehicle_type, brand, model, year_built,
+        registration_number, registration_country, registration_city, condition, availability_status,
+        axle_count, wheel_count, fuel_type, transmission_type, engine_power, mileage_km,
+        payload_tons, max_weight_kg, length_m, width_m, height_m, loading_volume_m3,
+        suspension_type, has_air_conditioning, has_gps, tire_condition, last_service_date, next_inspection_date,
+        rental_with_driver, daily_rate, weekly_rate, monthly_rate, km_rate, security_deposit,
+        available_from, available_until,
+        has_registration_certificate, has_insurance, has_inspection_certificate, has_tax_sticker,
+        has_driver_license, has_transport_authorization, has_customs_document,
+        image_urls, actif,
+      } = params as any;
+
+      if (!title) {
+        return jsonResponse({ error: "Le nom/titre de l'annonce est obligatoire" }, 400, corsHeaders);
+      }
+
+      const payload = {
+        organization_id: organizationId,
+        title,
+        vehicle_type: vehicle_type ?? null,
+        brand: brand ?? null,
+        model: model ?? null,
+        year_built: year_built ?? null,
+        registration_number: registration_number ?? null,
+        registration_country: registration_country ?? null,
+        registration_city: registration_city ?? null,
+        condition: condition ?? null,
+        availability_status: availability_status ?? "available",
+        axle_count: axle_count ?? null,
+        wheel_count: wheel_count ?? null,
+        fuel_type: fuel_type ?? null,
+        transmission_type: transmission_type ?? null,
+        engine_power: engine_power ?? null,
+        mileage_km: mileage_km ?? null,
+        payload_tons: payload_tons ?? null,
+        max_weight_kg: max_weight_kg ?? null,
+        length_m: length_m ?? null,
+        width_m: width_m ?? null,
+        height_m: height_m ?? null,
+        loading_volume_m3: loading_volume_m3 ?? null,
+        suspension_type: suspension_type ?? null,
+        has_air_conditioning: has_air_conditioning ?? false,
+        has_gps: has_gps ?? false,
+        tire_condition: tire_condition ?? null,
+        last_service_date: last_service_date ?? null,
+        next_inspection_date: next_inspection_date ?? null,
+        rental_with_driver: rental_with_driver ?? null,
+        daily_rate: daily_rate ?? null,
+        weekly_rate: weekly_rate ?? null,
+        monthly_rate: monthly_rate ?? null,
+        km_rate: km_rate ?? null,
+        security_deposit: security_deposit ?? null,
+        available_from: available_from ?? null,
+        available_until: available_until ?? null,
+        has_registration_certificate: has_registration_certificate ?? false,
+        has_insurance: has_insurance ?? false,
+        has_inspection_certificate: has_inspection_certificate ?? false,
+        has_tax_sticker: has_tax_sticker ?? false,
+        has_driver_license: has_driver_license ?? false,
+        has_transport_authorization: has_transport_authorization ?? false,
+        has_customs_document: has_customs_document ?? false,
+        image_urls: Array.isArray(image_urls) ? image_urls.slice(0, 4) : [],
+        actif: actif ?? true,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = id
+        ? await supabaseAdmin.from("trucks").update(payload).eq("id", id).eq("organization_id", organizationId)
+        : await supabaseAdmin.from("trucks").insert(payload);
+
+      if (error) throw error;
+      return jsonResponse({ success: true }, 200, corsHeaders);
+    }
+
+    if (action === "delete_truck") {
+      const { id } = params as any;
+      const { error } = await supabaseAdmin
+        .from("trucks")
         .delete()
         .eq("id", id)
         .eq("organization_id", organizationId);

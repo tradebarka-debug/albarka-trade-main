@@ -68,12 +68,12 @@ const CompaniesTab = () => {
         const ext = logoFile.name.split(".").pop() || "png";
         const filePath = `${crypto.randomUUID()}.${ext}`;
         const { error: uploadError } = await supabase.storage
-          .from("company-logos")
+          .from("voyages-images")
           .upload(filePath, logoFile);
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage
-          .from("company-logos")
+          .from("voyages-images")
           .getPublicUrl(filePath);
         logo_url = urlData.publicUrl;
       }
