@@ -671,34 +671,46 @@ export type Database = {
       deliveries: {
         Row: {
           created_at: string | null
+          delivery_latitude: number | null
+          delivery_longitude: number | null
           delivery_fee: number | null
           delivery_time: string | null
           distance_km: number | null
           driver_id: string | null
           id: number
           order_id: string | null
+          pickup_latitude: number | null
+          pickup_longitude: number | null
           pickup_time: string | null
           status: string | null
         }
         Insert: {
           created_at?: string | null
+          delivery_latitude?: number | null
+          delivery_longitude?: number | null
           delivery_fee?: number | null
           delivery_time?: string | null
           distance_km?: number | null
           driver_id?: string | null
           id?: number
           order_id?: string | null
+          pickup_latitude?: number | null
+          pickup_longitude?: number | null
           pickup_time?: string | null
           status?: string | null
         }
         Update: {
           created_at?: string | null
+          delivery_latitude?: number | null
+          delivery_longitude?: number | null
           delivery_fee?: number | null
           delivery_time?: string | null
           distance_km?: number | null
           driver_id?: string | null
           id?: number
           order_id?: string | null
+          pickup_latitude?: number | null
+          pickup_longitude?: number | null
           pickup_time?: string | null
           status?: string | null
         }
