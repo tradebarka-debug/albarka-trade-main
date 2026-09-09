@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     const normalizedRole = String(roleCode ?? "").trim().toLowerCase();
     const capabilities = {
       viewAll: isPdg || ["manager", "accountant"].includes(normalizedRole),
-      manageOrders: isPdg || ["manager", "cashier", "cook"].includes(normalizedRole),
+      manageOrders: isPdg || ["manager", "cashier", "cook", "cuisinier"].includes(normalizedRole),
       managePayments: isPdg || ["manager", "cashier"].includes(normalizedRole),
       manageDelivery: isPdg || normalizedRole === "manager",
       manageCash: isPdg || ["manager", "cashier"].includes(normalizedRole),
@@ -382,18 +382,45 @@ if (action === "respond_restaurant_preorder") {
     );
   }
 
-  const { data, error } = await supabaseUser.rpc(
-    "respond_restaurant_preorder",
-    {
-      p_order_id: order_id,
-      p_accept: accept,
-      p_rejection_reason: accept
-        ? null
-        : String(rejection_reason ?? "").trim(),
-    }
-  );
+  const rejectionReason = accept ? null : String(rejection_reason ?? "").trim();
+  if (!accept && !rejectionReason) {
+    return jsonResponse({ error: "Le motif du refus est obligatoire" }, 400, corsHeaders);
+  }
 
+  const { data: restaurant, error: restaurantError } = await supabaseAdmin
+    .from("restaurant_partners")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (restaurantError) throw restaurantError;
+  if (!restaurant) return jsonResponse({ error: "Restaurant introuvable" }, 404, corsHeaders);
+
+  const outletId = await resolveOutletId(params.restaurant_outlet_id);
+  let orderQuery = supabaseAdmin
+    .from("orders")
+    .select("id, restaurant_confirmation_status")
+    .eq("id", order_id)
+    .eq("restaurant_id", restaurant.id);
+  if (outletId) orderQuery = orderQuery.eq("restaurant_outlet_id", outletId);
+  const { data: order, error: orderError } = await orderQuery.maybeSingle();
+  if (orderError) throw orderError;
+  if (!order) return jsonResponse({ error: "Commande introuvable pour votre restaurant ou votre point de vente" }, 404, corsHeaders);
+  if (order.restaurant_confirmation_status !== "pending") {
+    return jsonResponse({ error: "Cette précommande a déjà reçu une réponse" }, 409, corsHeaders);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("orders")
+    .update({
+      restaurant_confirmation_status: accept ? "accepted" : "rejected",
+      restaurant_rejection_reason: rejectionReason,
+    })
+    .eq("id", order.id)
+    .eq("restaurant_confirmation_status", "pending")
+    .select("id, restaurant_confirmation_status")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) return jsonResponse({ error: "La précommande a déjà été traitée" }, 409, corsHeaders);
 
   return jsonResponse(
     { success: true, result: data },
