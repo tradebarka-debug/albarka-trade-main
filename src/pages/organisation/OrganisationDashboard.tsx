@@ -1222,6 +1222,11 @@ export default function OrganisationDashboard() {
               </Button>
             </div>
           )}
+          {!capabilities.manageLogistics && (
+            <div role="note" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-800">
+              Consultation uniquement. L’enregistrement et la modification des camions sont réservés à l’administrateur, au PDG ou au responsable de l’organisation.
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {trucks.map((truck) => (
               <Card

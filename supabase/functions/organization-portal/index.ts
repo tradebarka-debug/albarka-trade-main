@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select("id, organization_id, organization_role_id, country_id, restaurant_outlet_id, is_active")
+      .select("id, role, organization_id, organization_role_id, country_id, restaurant_outlet_id, is_active")
       .eq("id", currentUser.id)
       .maybeSingle();
 
@@ -72,6 +72,14 @@ Deno.serve(async (req) => {
     }
 
     const organizationId = profile.organization_id as number;
+    const { data: systemAdminRole, error: systemAdminRoleError } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id")
+      .eq("user_id", currentUser.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (systemAdminRoleError) throw systemAdminRoleError;
+    const isSystemAdmin = profile.role === "admin" || Boolean(systemAdminRole);
     let roleCode: string | null = null;
     if (profile.organization_role_id) {
       const { data: roleRow, error: roleError } = await supabaseAdmin
@@ -95,7 +103,7 @@ Deno.serve(async (req) => {
       manageAccounting: isPdg || ["manager", "accountant"].includes(normalizedRole),
       manageTeam: isPdg,
       manageCatalog: isPdg || normalizedRole === "manager",
-      manageLogistics: isPdg || normalizedRole === "manager",
+      manageLogistics: isSystemAdmin || isPdg || normalizedRole === "manager",
     };
 
     const { action, ...params } = await req.json();

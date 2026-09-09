@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Bell, PackageCheck } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +10,7 @@ type Delivery = { id: number; order_id: string | null; status: string | null; de
 const statusLabels: Record<string, string> = { pending: "À accepter", accepted: "Acceptée", picked_up: "Commande récupérée", in_progress: "En route", on_the_way: "En route", delivered: "Livrée", cancelled: "Annulée" };
 const nextStatus: Record<string, { status: string; label: string }> = {
   pending: { status: "accepted", label: "Accepter la livraison" },
+  assigned: { status: "accepted", label: "Accepter la livraison" },
   accepted: { status: "picked_up", label: "Commande récupérée" },
   picked_up: { status: "in_progress", label: "Je suis en route" },
   in_progress: { status: "delivered", label: "Livraison terminée" },
@@ -27,6 +29,7 @@ export default function DriverDashboard() {
   const availabilityVersion = useRef(0);
   const loadSequence = useRef(0);
   const availabilitySaving = useRef(false);
+  const knownDeliveryIds = useRef<Set<number> | null>(null);
   const [availabilityError, setAvailabilityError] = useState(false);
   const activeDelivery = deliveries.find(delivery => delivery.id === currentDeliveryId && !["delivered", "cancelled"].includes(delivery.status ?? ""));
 
@@ -40,7 +43,18 @@ export default function DriverDashboard() {
     ]);
     if (sequence !== loadSequence.current) return;
     if (deliveryResult.error) toast.error("Impossible d’actualiser vos livraisons.");
-    else setDeliveries(deliveryResult.data || []);
+    else {
+      const nextDeliveries = deliveryResult.data || [];
+      const previousIds = knownDeliveryIds.current;
+      if (previousIds) {
+        const newlyAssigned = nextDeliveries.filter(delivery => !previousIds.has(delivery.id) && !["delivered", "cancelled"].includes(delivery.status ?? ""));
+        if (newlyAssigned.length) {
+          toast.success(newlyAssigned.length === 1 ? `Nouvelle livraison #${newlyAssigned[0].id} attribuée` : `${newlyAssigned.length} nouvelles livraisons attribuées`);
+        }
+      }
+      knownDeliveryIds.current = new Set(nextDeliveries.map(delivery => delivery.id));
+      setDeliveries(nextDeliveries);
+    }
     if (version === availabilityVersion.current && !availabilitySaving.current) {
       setAvailabilityError(!!statusResult.error);
       if (!statusResult.error) {
@@ -123,9 +137,11 @@ export default function DriverDashboard() {
     setSaving(null);
   };
 
+  const pendingCount = deliveries.filter(delivery => ["pending", "assigned"].includes(delivery.status ?? "")).length;
+
   if (loading) return <main className="p-6">Chargement de vos livraisons…</main>;
   return <main className="min-h-screen bg-background p-6 md:p-10"><div className="mx-auto max-w-5xl space-y-6">
-    <div><h1 className="text-3xl font-bold">Espace livreur</h1><p className="mt-2 text-muted-foreground">Consultez les livraisons qui vous sont attribuées.</p></div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-3xl font-bold">Espace livreur</h1><p className="mt-2 text-muted-foreground">Consultez les livraisons qui vous sont attribuées.</p></div>{pendingCount > 0 && <div role="status" className="flex w-fit items-center gap-2 rounded-full bg-amber-500/15 px-4 py-2 font-semibold text-amber-700"><Bell className="h-4 w-4" />{pendingCount} livraison{pendingCount > 1 ? "s" : ""} à accepter</div>}</div>
     <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-bold">Ma disponibilité</h2>
       <button onClick={() => void toggleAvailability()} disabled={locationLoading || isAvailable === null || availabilityError} className="rounded-lg bg-primary px-5 py-3 font-bold text-primary-foreground disabled:opacity-50">{locationLoading ? "Enregistrement…" : availabilityError ? "Disponibilité non chargée" : isAvailable === null ? "Chargement…" : isAvailable ? "Me rendre indisponible" : "Je suis disponible"}</button>
       {availabilityError && <p role="alert" className="text-sm text-destructive">Impossible de lire votre disponibilité. <button className="underline" onClick={() => void load()}>Réessayer</button></p>}
@@ -135,7 +151,7 @@ export default function DriverDashboard() {
     <section className="rounded-xl border p-5"><h2 className="mb-4 text-xl font-bold">Mes livraisons ({deliveries.length})</h2>
       {!deliveries.length ? <p className="text-muted-foreground">Aucune livraison ne vous est attribuée.</p> : <div className="space-y-4">{deliveries.map(delivery => {
         const action = nextStatus[delivery.status ?? ""];
-        return <div key={delivery.id} className="space-y-2 rounded-lg border p-4"><p className="font-bold">Livraison #{delivery.id}</p><p>Commande : {delivery.order_id || "—"}</p><p>Statut : {statusLabels[delivery.status ?? ""] || delivery.status || "En attente"}</p><p>Frais : {Number(delivery.delivery_fee || 0).toLocaleString("fr-FR")} FCFA</p>{action && <button disabled={saving != null} onClick={() => void updateStatus(delivery, action.status)} className="rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50">{saving === delivery.id ? "Enregistrement…" : action.label}</button>}</div>;
+        return <div key={delivery.id} className={`space-y-2 rounded-lg border p-4 ${["pending", "assigned"].includes(delivery.status ?? "") ? "border-amber-500/50 bg-amber-500/5" : ""}`}><div className="flex items-center gap-2"><PackageCheck className="h-5 w-5 text-primary" /><p className="font-bold">Livraison #{delivery.id}</p></div><p>Commande : {delivery.order_id || "—"}</p><p>Statut : {statusLabels[delivery.status ?? ""] || delivery.status || "En attente"}</p><p>Frais : {Number(delivery.delivery_fee || 0).toLocaleString("fr-FR")} FCFA</p>{action && <button disabled={saving != null} onClick={() => void updateStatus(delivery, action.status)} className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50 sm:w-auto">{saving === delivery.id ? "Enregistrement…" : action.label}</button>}</div>;
       })}</div>}
     </section>
   </div></main>;

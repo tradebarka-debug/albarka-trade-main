@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 const UserSpace = () => {
-  const { user, signOut, canAccessAdmin, organizationRoleName, isLoading } = useAuth();
+  const { user, signOut, canAccessAdmin, organizationRoleCode, organizationRoleName, isLoading } = useAuth();
   const { toast } = useToast();
   const [showDeletionRequest, setShowDeletionRequest] = useState(false);
   const [deletionReason, setDeletionReason] = useState("");
@@ -46,6 +46,7 @@ const UserSpace = () => {
   }
 
   const fullName = user.user_metadata?.full_name || "Utilisateur";
+  const isDeliveryDriver = userRole === "livreur" || organizationRoleCode === "delivery_driver";
 
   const requestOwnDeletion = async () => {
     if (deletionReason.trim().length < 5) {
@@ -108,7 +109,7 @@ const UserSpace = () => {
                 Voir mon panier
               </Link>
             </Button>
-            {userRole === "livreur" && (
+            {isDeliveryDriver && (
               <Button variant="outline" asChild>
                 <Link to="/espace-livreur">
                   <Truck className="h-4 w-4" />
@@ -124,7 +125,7 @@ const UserSpace = () => {
                 </Link>
               </Button>
             )}
-            {organizationRoleName && userRole !== "livreur" && (
+            {organizationRoleName && !isDeliveryDriver && (
               <Button variant="outline" asChild>
                 <Link to="/organisation">
                   <User className="h-4 w-4" />
