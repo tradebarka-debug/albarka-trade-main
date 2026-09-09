@@ -382,7 +382,7 @@ if (action === "respond_restaurant_preorder") {
     );
   }
 
-  const { data, error } = await supabaseUser.rpc(
+  let { data, error } = await supabaseUser.rpc(
     "respond_restaurant_preorder",
     {
       p_order_id: order_id,
@@ -393,7 +393,49 @@ if (action === "respond_restaurant_preorder") {
     }
   );
 
+  // Les comptes cuisiniers créés par le portail organisationnel ne sont pas
+  // toujours connus de l'ancienne fonction SQL. Conserver cette fonction en
+  // priorité, puis appliquer un repli strictement limité au restaurant et au
+  // point de vente du cuisinier authentifié.
+  if (error && ["cook", "cuisinier"].includes(normalizedRole)) {
+    const { data: restaurant, error: restaurantError } = await supabaseAdmin
+      .from("restaurant_partners")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (restaurantError) throw restaurantError;
+    if (!restaurant) return jsonResponse({ error: "Restaurant introuvable" }, 404, corsHeaders);
+
+    const outletId = await resolveOutletId();
+    let orderQuery = supabaseAdmin
+      .from("orders")
+      .select("id, restaurant_confirmation_status")
+      .eq("id", order_id)
+      .eq("restaurant_id", restaurant.id);
+    if (outletId) orderQuery = orderQuery.eq("restaurant_outlet_id", outletId);
+    const { data: scopedOrder, error: scopedOrderError } = await orderQuery.maybeSingle();
+    if (scopedOrderError) throw scopedOrderError;
+    if (!scopedOrder) return jsonResponse({ error: "Commande introuvable pour votre point de vente" }, 404, corsHeaders);
+    if (scopedOrder.restaurant_confirmation_status !== "pending") {
+      return jsonResponse({ error: "Cette précommande a déjà été traitée" }, 409, corsHeaders);
+    }
+
+    const fallbackResult = await supabaseAdmin
+      .from("orders")
+      .update({
+        restaurant_confirmation_status: accept ? "accepted" : "rejected",
+        restaurant_rejection_reason: accept ? null : String(rejection_reason ?? "").trim(),
+      })
+      .eq("id", scopedOrder.id)
+      .eq("restaurant_confirmation_status", "pending")
+      .select("id, restaurant_confirmation_status")
+      .maybeSingle();
+    data = fallbackResult.data;
+    error = fallbackResult.error;
+  }
+
   if (error) throw error;
+  if (!data) return jsonResponse({ error: "La précommande n'a pas été mise à jour" }, 409, corsHeaders);
 
   return jsonResponse(
     { success: true, result: data },
