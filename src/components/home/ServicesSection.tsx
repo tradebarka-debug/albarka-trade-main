@@ -10,18 +10,21 @@ const services = [
     title: "Logistique",
     description: "Transport et distribution de marchandises à travers le " + countryName + " et la sous-région",
     color: "primary",
+    href: "/location-camions",
   },
   {
     icon: Globe,
     title: "Import & Export",
     description: "Commerce international avec des partenaires de confiance dans le monde entier",
     color: "secondary",
+    href: "/services",
   },
   {
     icon: HeadphonesIcon,
     title: "Support Partenaires",
     description: "Accompagnement personnalisé pour producteurs et distributeurs",
     color: "accent",
+    href: "/contact",
   },
 ];
 
@@ -46,8 +49,9 @@ const ServicesSection = () => {
         {/* Services Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {services.map((service, index) => (
-            <div
+            <Link
               key={service.title}
+              to={service.href}
               className="group bg-background rounded-2xl p-8 border border-border card-hover text-center animate-fade-in"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
@@ -58,7 +62,8 @@ const ServicesSection = () => {
               <p className="text-muted-foreground leading-relaxed">
                 {service.description}
               </p>
-            </div>
+              <span className="mt-5 inline-flex items-center gap-1 font-semibold text-primary">Découvrir <ArrowRight className="h-4 w-4" /></span>
+            </Link>
           ))}
         </div>
 
