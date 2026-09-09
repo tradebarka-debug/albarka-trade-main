@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
       if (roleError) throw roleError;
       roleCode = roleRow?.code ?? null;
     }
-    const isPdg = ["ceo", "pdg", "president", "directeur_general", "directeur_generale", "general_management"].includes(
+    const isPdg = ["ceo", "pdg", "transport_pdg", "president", "directeur_general", "directeur_generale", "general_management"].includes(
       String(roleCode ?? "").trim().toLowerCase()
     );
     const normalizedRole = String(roleCode ?? "").trim().toLowerCase();

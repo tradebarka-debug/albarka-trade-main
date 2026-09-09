@@ -140,7 +140,7 @@ export default function OrganisationDashboard() {
   const openCashSession = cashSessions.find((session) => session.status === "open");
   const totalIncome = financialEntries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
   const totalExpenses = financialEntries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const employeeRoles = roles.filter((role) => !["ceo", "pdg", "president", "directeur_general", "directeur_generale", "general_management"].includes(role.code.toLowerCase()));
+  const employeeRoles = roles.filter((role) => !["ceo", "pdg", "transport_pdg", "president", "directeur_general", "directeur_generale", "general_management"].includes(role.code.toLowerCase()));
 
   const createEmployee = async () => {
     if (!employeeForm.full_name.trim() || !employeeForm.email.trim() || !employeeForm.telephone.trim() || !employeeForm.organization_role_id || !employeeForm.restaurant_outlet_id || employeeForm.password.length < 6) {
