@@ -205,8 +205,8 @@ const Paiement = () => {
 
     let cancelled = false;
 
-    const loadDriverOptions = async () => {
-      setDriversLoading(true);
+    const loadDriverOptions = async (showLoading = false) => {
+      if (showLoading) setDriversLoading(true);
 
       const { data, error } = await (supabase as any).rpc(
         "get_driver_options",
@@ -233,19 +233,20 @@ const Paiement = () => {
           );
         }
 
-        setDriversLoading(false);
+        if (showLoading) setDriversLoading(false);
       }
     };
 
-    void loadDriverOptions();
+    void loadDriverOptions(true);
+    const intervalId = window.setInterval(() => { void loadDriverOptions(); }, 15000);
 
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [
     requiresDelivery,
-    coordinates?.latitude,
-    coordinates?.longitude,
+    coordinates,
     restaurantConfig?.latitude,
     restaurantConfig?.longitude,
   ]);
