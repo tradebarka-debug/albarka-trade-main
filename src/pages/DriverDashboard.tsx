@@ -15,6 +15,11 @@ const nextStatus: Record<string, { status: string; label: string }> = {
   picked_up: { status: "in_progress", label: "Je suis en route" },
   in_progress: { status: "delivered", label: "Livraison terminée" },
 };
+const managementActions = [
+  { from: ["accepted"], status: "picked_up", label: "Commande récupérée" },
+  { from: ["picked_up"], status: "in_progress", label: "Je suis en route" },
+  { from: ["in_progress", "on_the_way"], status: "delivered", label: "Livraison terminée" },
+];
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -33,6 +38,7 @@ export default function DriverDashboard() {
   const knownDeliveryIds = useRef<Set<number> | null>(null);
   const [availabilityError, setAvailabilityError] = useState(false);
   const activeDelivery = deliveries.find(delivery => delivery.id === currentDeliveryId && !["delivered", "cancelled"].includes(delivery.status ?? ""));
+  const manageableDelivery = activeDelivery ?? deliveries.find(delivery => !["delivered", "cancelled"].includes(delivery.status ?? ""));
 
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -153,6 +159,7 @@ export default function DriverDashboard() {
       {activeDelivery && <p className="text-sm">Livraison en cours. Votre choix de disponibilité est conservé pour la suite.</p>}
       {activeDelivery && <div className="space-y-2"><p className="text-sm text-muted-foreground">Partagez votre position avec le client de votre livraison en cours tant que cette page reste ouverte.</p><button className="rounded-lg border px-4 py-2 font-semibold" onClick={() => setSharing(value => !value)}>{sharing ? "Arrêter le partage de position" : "Partager ma position pendant la livraison"}</button></div>}
     </section>
+    <section className="rounded-xl border p-5"><h2 className="text-xl font-bold">Gestion de la livraison</h2><p className="mt-1 text-sm text-muted-foreground">{manageableDelivery ? `Livraison #${manageableDelivery.id} · ${statusLabels[manageableDelivery.status ?? ""] || manageableDelivery.status || "En attente"}` : "Aucune livraison active. Les boutons seront disponibles dès qu’une livraison vous sera attribuée."}</p><div className="mt-4 grid gap-2 sm:grid-cols-3">{managementActions.map(action => { const enabled = Boolean(manageableDelivery && action.from.includes(manageableDelivery.status ?? "")); return <button key={action.status} type="button" disabled={!enabled || saving != null} onClick={() => manageableDelivery && void updateStatus(manageableDelivery, action.status)} className="rounded-lg border bg-background px-3 py-3 text-sm font-semibold transition enabled:border-primary enabled:bg-primary enabled:text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45">{saving === manageableDelivery?.id && enabled ? "Enregistrement…" : action.label}</button>; })}</div></section>
     <section className="rounded-xl border p-5"><h2 className="mb-4 text-xl font-bold">Mes livraisons ({deliveries.length})</h2>
       {deliveriesError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><p className="font-semibold">Vos livraisons ne peuvent pas être chargées.</p><p className="mt-1 break-words">{deliveriesError}</p><button className="mt-3 font-semibold underline" onClick={() => void load()}>Réessayer</button></div> : !deliveries.length ? <p className="text-muted-foreground">Aucune livraison ne vous est attribuée.</p> : <div className="space-y-4">{deliveries.map(delivery => {
         const action = nextStatus[delivery.status ?? ""];
