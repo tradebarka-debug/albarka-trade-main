@@ -28,6 +28,7 @@ export default function DriverDashboard() {
   const [loading, setLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [currentDeliveryId, setCurrentDeliveryId] = useState<number | null>(null);
+  const [hasStoredLocation, setHasStoredLocation] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState<number | null>(null);
@@ -46,7 +47,7 @@ export default function DriverDashboard() {
     const sequence = ++loadSequence.current;
     const [deliveryResult, statusResult] = await Promise.all([
       driverClient.from("deliveries").select("id, order_id, status, delivery_fee").eq("driver_id", user.id).order("id", { ascending: false }),
-      driverClient.from("driver_status").select("is_available, current_delivery_id").eq("driver_id", user.id).maybeSingle(),
+      driverClient.from("driver_status").select("is_available, current_delivery_id, latitude, longitude").eq("driver_id", user.id).maybeSingle(),
     ]);
     if (sequence !== loadSequence.current) return;
     if (deliveryResult.error) {
@@ -71,6 +72,7 @@ export default function DriverDashboard() {
       if (!statusResult.error) {
         setIsAvailable(statusResult.data?.is_available === true);
         setCurrentDeliveryId(statusResult.data?.current_delivery_id ?? null);
+        setHasStoredLocation(statusResult.data?.latitude != null && statusResult.data?.longitude != null);
       }
     }
     setLoading(false);
@@ -120,14 +122,16 @@ export default function DriverDashboard() {
     };
     const save = async (coordinates?: GeolocationCoordinates) => {
       try {
+        const locationValues = coordinates ? { latitude: coordinates.latitude, longitude: coordinates.longitude } : {};
         const query = isAvailable
           ? driverClient.from("driver_status").update({ is_available: false }).eq("driver_id", user.id)
           : driverClient.from("driver_status").upsert({ driver_id: user.id, is_available: true,
-              latitude: coordinates?.latitude, longitude: coordinates?.longitude, last_seen_at: new Date().toISOString() });
-        const { data, error } = await query.select("is_available, current_delivery_id").single();
+              ...locationValues, last_seen_at: new Date().toISOString() });
+        const { data, error } = await query.select("is_available, current_delivery_id, latitude, longitude").single();
         if (error || !data) throw error || new Error("Disponibilité non enregistrée");
         setIsAvailable(data.is_available === true);
         setCurrentDeliveryId(data.current_delivery_id ?? null);
+        setHasStoredLocation(data.latitude != null && data.longitude != null);
         setAvailabilityError(false);
       } catch { toast.error("Disponibilité non enregistrée. Réessayez."); }
       finally { finish(); }
@@ -135,8 +139,17 @@ export default function DriverDashboard() {
     if (isAvailable) { await save(); return; }
     if (!navigator.geolocation) { toast.error("Géolocalisation indisponible."); finish(); return; }
     navigator.geolocation.getCurrentPosition(position => { void save(position.coords); },
-      () => { toast.error("Impossible d’obtenir votre position GPS."); finish(); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      () => {
+        navigator.geolocation.getCurrentPosition(position => { void save(position.coords); }, () => {
+          if (hasStoredLocation) {
+            toast.info("GPS immédiat indisponible : votre dernière position enregistrée est conservée.");
+            void save();
+          } else {
+            toast.error("Impossible d’obtenir votre position GPS. Autorisez la localisation dans le navigateur.");
+            finish();
+          }
+        }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
   };
   const updateStatus = async (delivery: Delivery, status: string) => {
     if (saving != null || !user) return;
