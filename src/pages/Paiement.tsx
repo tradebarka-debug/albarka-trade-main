@@ -700,11 +700,11 @@ const order = Array.isArray(paymentRows)
         setIsSubmitting(false);
         return;
       }
-      if (requiresDelivery && order?.id) {
-        const { error: deliveryError } = await (supabase as any)
+      if (requiresDelivery) {
+        const { data: createdDelivery, error: deliveryError } = await (supabase as any)
           .from("deliveries")
           .insert({
-            order_id: order.id,
+            order_id: preorderId,
             driver_id: selectedDriverId || null,
             distance_km: distanceKm,
             pickup_latitude: Number(restaurantConfig?.latitude),
@@ -713,11 +713,13 @@ const order = Array.isArray(paymentRows)
             delivery_longitude: coordinates?.longitude ?? null,
             status: "pending",
             delivery_fee: deliveryFee,
-          });
+          })
+          .select("id, order_id, driver_id")
+          .single();
 
-        if (deliveryError) {
+        if (deliveryError || !createdDelivery || createdDelivery.driver_id !== selectedDriverId) {
           console.error("Erreur création livraison :", deliveryError);
-          toast.error("Commande enregistrée, mais livraison non créée.");
+          toast.error(deliveryError?.message || "Commande enregistrée, mais l’attribution au livreur n’a pas été confirmée.");
         }
       }
       setTrackingNumber(order?.tracking_number || "");
