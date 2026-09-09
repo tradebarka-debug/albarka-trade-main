@@ -106,12 +106,19 @@ export default function AdminDrivers() {
     deliveryId: number,
     driverId: string
   ) => {
-    const { error } = await deliveriesTable
+    const { data, error } = await deliveriesTable
       .update({ driver_id: driverId || null })
-      .eq("id", deliveryId);
+      .eq("id", deliveryId)
+      .select("id, driver_id")
+      .maybeSingle();
 
-    if (error) {
-      toast.error(error.message);
+    if (error || !data) {
+      toast.error(error?.message || "Attribution non enregistrée : accès refusé ou livraison introuvable.");
+      return;
+    }
+
+    if ((data.driver_id || "") !== driverId) {
+      toast.error("Attribution non confirmée par la base de données.");
       return;
     }
 
