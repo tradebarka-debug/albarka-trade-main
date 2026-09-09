@@ -110,6 +110,9 @@ const Paiement = () => {
   const [preorderStatus, setPreorderStatus] = useState<  "idle" | "pending" | "accepted" | "rejected" >("idle");
   const [preorderLoading, setPreorderLoading] = useState(false);
   const [preorderError, setPreorderError] = useState("");
+  const [preorderExpiresAt, setPreorderExpiresAt] = useState<number | null>(null);
+  const [waitingSeconds, setWaitingSeconds] = useState(600);
+  const [whatsappNotificationUrl, setWhatsappNotificationUrl] = useState("");
   const [requiresDelivery, setRequiresDelivery] = useState(true);
   const [disposableKits, setDisposableKits] = useState(false);
   const [kitQuantity, setKitQuantity] = useState(1);
@@ -117,6 +120,25 @@ const Paiement = () => {
   const [restaurantConfigLoading, setRestaurantConfigLoading] = useState(false);
   const [restaurantConfigMissing, setRestaurantConfigMissing] = useState(false);
   const restaurantId = items.find((item) => item.restaurantId)?.restaurantId || null;
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("pending_preorder_context") || "null");
+      if (!saved?.id || !saved?.expiresAt || saved.expiresAt <= Date.now()) return;
+      setPreorderId(saved.id);
+      setPreorderStatus("pending");
+      setPreorderExpiresAt(saved.expiresAt);
+      setWhatsappNotificationUrl(saved.whatsappUrl || "");
+      if (saved.formData) setFormData(saved.formData);
+      if (saved.coordinates) setCoordinates(saved.coordinates);
+      if (saved.selectedDriverId) setSelectedDriverId(saved.selectedDriverId);
+      if (typeof saved.requiresDelivery === "boolean") setRequiresDelivery(saved.requiresDelivery);
+      if (typeof saved.disposableKits === "boolean") setDisposableKits(saved.disposableKits);
+      if (Number.isFinite(saved.kitQuantity)) setKitQuantity(saved.kitQuantity);
+    } catch {
+      localStorage.removeItem("pending_preorder_context");
+    }
+  }, []);
 
   useEffect(() => {
     if (!restaurantId) { setRestaurantConfig(null); setRestaurantConfigMissing(false); return; }
@@ -310,7 +332,7 @@ const Paiement = () => {
     return fileName;
   };
 
-  const sendWhatsAppNotification = (order: { tracking_number?: string | null; queue_number?: number | null }, restaurantDetails: any) => {
+  const buildWhatsAppNotificationUrl = (order: { tracking_number?: string | null; queue_number?: number | null }, restaurantDetails: any) => {
     const restaurantPhone = String(restaurantDetails?.whatsapp || restaurantDetails?.telephone || "").replace(/\D/g, "");
     if (!restaurantPhone) return false;
     const methodName = paymentMethods.find(m => m.id === selectedMethod)?.name || selectedMethod;
@@ -336,7 +358,6 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
 
 ⏰ Merci de confirmer la prise en charge de cette commande.`;
 
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     // wa.me est le lien universel officiel WhatsApp : fonctionne sur mobile
     // (ouvre l'app) comme sur desktop (ouvre WhatsApp Web ou propose l'app).
     const whatsappUrl = `https://wa.me/${restaurantPhone}?text=${encodeURIComponent(message)}`;
@@ -344,8 +365,7 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
     // Redirection directe de l'onglet courant : window.open("_blank") est
     // souvent bloqué par le navigateur une fois qu'un await a eu lieu avant
     // l'appel (perte du contexte "geste utilisateur").
-    window.location.href = whatsappUrl;
-    return true;
+    return whatsappUrl;
   };
   const appliedPromoCode =
     location.state?.appliedPromoCode ||
@@ -512,15 +532,20 @@ ${items.map(item => `• ${item.name} x${item.quantity} = ${formatPrice(item.pri
     );
 
     if (confirmationRequired) {
+      const expiresAt = Date.now() + 10 * 60 * 1000;
+      const whatsappUrl = buildWhatsAppNotificationUrl(order, restaurantConfig) || "";
       setPreorderStatus("pending");
+      setPreorderExpiresAt(expiresAt);
+      setWaitingSeconds(600);
+      setWhatsappNotificationUrl(whatsappUrl);
+      localStorage.setItem("pending_preorder_context", JSON.stringify({
+        id: order.id, expiresAt, whatsappUrl, formData, coordinates, selectedDriverId,
+        requiresDelivery, disposableKits, kitQuantity,
+      }));
       toast.success(
         "Précommande envoyée. En attente du restaurant."
       );
 
-      sendWhatsAppNotification(
-        order,
-        restaurantConfig
-      );
     } else {
       setPreorderStatus("accepted");
       toast.success(
@@ -555,11 +580,15 @@ useEffect(() => {
       .maybeSingle();
 
     if (error || !data) {
+      setPreorderError(error?.message || "Impossible de vérifier la réponse du cuisinier.");
       return;
     }
+    setPreorderError("");
 
     if (data.restaurant_confirmation_status === "accepted") {
       setPreorderStatus("accepted");
+      setPreorderExpiresAt(null);
+      localStorage.removeItem("pending_preorder_context");
       toast.success(
         "Le restaurant a confirmé les plats. Vous pouvez payer."
       );
@@ -568,6 +597,8 @@ useEffect(() => {
 
     if (data.restaurant_confirmation_status === "rejected") {
       setPreorderStatus("rejected");
+      setPreorderExpiresAt(null);
+      localStorage.removeItem("pending_preorder_context");
       setPreorderError(
         data.restaurant_rejection_reason ||
           "Le restaurant a refusé la précommande."
@@ -589,6 +620,21 @@ useEffect(() => {
     window.clearInterval(intervalId);
   };
 }, [preorderId, preorderStatus]);
+useEffect(() => {
+  if (preorderStatus !== "pending" || !preorderExpiresAt) return;
+  const updateCountdown = () => {
+    const remaining = Math.max(0, Math.ceil((preorderExpiresAt - Date.now()) / 1000));
+    setWaitingSeconds(remaining);
+    if (remaining === 0) {
+      setPreorderStatus("rejected");
+      setPreorderError("Le délai de confirmation de 10 minutes est expiré. Veuillez recommencer la commande.");
+      localStorage.removeItem("pending_preorder_context");
+    }
+  };
+  updateCountdown();
+  const timer = window.setInterval(updateCountdown, 1000);
+  return () => window.clearInterval(timer);
+}, [preorderStatus, preorderExpiresAt]);
   const handleSubmitOrder = async () => {
     try {
     if (!preorderId || preorderStatus !== "accepted") {
@@ -751,7 +797,7 @@ const order = Array.isArray(paymentRows)
           .maybeSingle();
         notificationRestaurant = data;
       }
-      sendWhatsAppNotification(order || {}, notificationRestaurant);
+      setWhatsappNotificationUrl(buildWhatsAppNotificationUrl(order || {}, notificationRestaurant) || "");
     } catch (error) {
       console.error('Error submitting order:', error);
       toast.error("Une erreur est survenue. Veuillez réessayer.");
@@ -777,7 +823,7 @@ const order = Array.isArray(paymentRows)
     : basePaymentMethod;
 
 
-  if (items.length === 0 && step !== 3) {
+  if (items.length === 0 && step !== 3 && preorderStatus !== "pending") {
     navigate("/panier");
     return null;
   }
@@ -823,7 +869,19 @@ const order = Array.isArray(paymentRows)
           </div>
 
           {/* Step 1: Delivery Info */}
-          {step === 1 && (
+          {step === 1 && preorderStatus === "pending" && (
+            <div className="rounded-2xl border border-primary/30 bg-card p-6 text-center shadow-sm md:p-8" role="status">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-2xl">⏳</div>
+              <h2 className="mt-5 text-2xl font-bold">En attente de la confirmation du cuisinier</h2>
+              <p className="mt-3 text-muted-foreground">Cette page vérifie automatiquement la réponse. Elle ouvrira le paiement dès que le cuisinier acceptera la précommande.</p>
+              <p className="mt-5 font-mono text-3xl font-bold text-primary">{String(Math.floor(waitingSeconds / 60)).padStart(2, "0")}:{String(waitingSeconds % 60).padStart(2, "0")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">Temps restant sur les 10 minutes</p>
+              {preorderError && <p className="mt-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{preorderError}</p>}
+              {whatsappNotificationUrl && <a href={whatsappNotificationUrl} target="_blank" rel="noopener noreferrer" className="mt-6 inline-flex min-h-12 items-center justify-center rounded-lg bg-green-600 px-5 py-3 font-bold text-white hover:bg-green-700"><Phone className="mr-2 h-5 w-5" />Envoyer les détails au cuisinier sur WhatsApp</a>}
+              <p className="mt-4 text-xs text-muted-foreground">Gardez cette page ouverte. WhatsApp s’ouvre séparément et ne ferme plus cette attente.</p>
+            </div>
+          )}
+          {step === 1 && preorderStatus !== "pending" && (
             <div className="bg-card rounded-2xl p-6 md:p-8 shadow-sm border border-border animate-fade-in">
               <h2 className="font-display text-2xl font-bold text-foreground mb-6">
                 Informations de Livraison
