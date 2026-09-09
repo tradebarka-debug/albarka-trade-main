@@ -19,6 +19,7 @@ const nextStatus: Record<string, { status: string; label: string }> = {
 export default function DriverDashboard() {
   const { user } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [deliveriesError, setDeliveriesError] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [currentDeliveryId, setCurrentDeliveryId] = useState<number | null>(null);
@@ -42,8 +43,12 @@ export default function DriverDashboard() {
       driverClient.from("driver_status").select("is_available, current_delivery_id").eq("driver_id", user.id).maybeSingle(),
     ]);
     if (sequence !== loadSequence.current) return;
-    if (deliveryResult.error) toast.error("Impossible d’actualiser vos livraisons.");
+    if (deliveryResult.error) {
+      setDeliveriesError(`Accès aux livraisons refusé : ${deliveryResult.error.message}`);
+      toast.error("Impossible d’actualiser vos livraisons.");
+    }
     else {
+      setDeliveriesError("");
       const nextDeliveries = deliveryResult.data || [];
       const previousIds = knownDeliveryIds.current;
       if (previousIds) {
@@ -149,7 +154,7 @@ export default function DriverDashboard() {
       {activeDelivery && <div className="space-y-2"><p className="text-sm text-muted-foreground">Partagez votre position avec le client de votre livraison en cours tant que cette page reste ouverte.</p><button className="rounded-lg border px-4 py-2 font-semibold" onClick={() => setSharing(value => !value)}>{sharing ? "Arrêter le partage de position" : "Partager ma position pendant la livraison"}</button></div>}
     </section>
     <section className="rounded-xl border p-5"><h2 className="mb-4 text-xl font-bold">Mes livraisons ({deliveries.length})</h2>
-      {!deliveries.length ? <p className="text-muted-foreground">Aucune livraison ne vous est attribuée.</p> : <div className="space-y-4">{deliveries.map(delivery => {
+      {deliveriesError ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><p className="font-semibold">Vos livraisons ne peuvent pas être chargées.</p><p className="mt-1 break-words">{deliveriesError}</p><button className="mt-3 font-semibold underline" onClick={() => void load()}>Réessayer</button></div> : !deliveries.length ? <p className="text-muted-foreground">Aucune livraison ne vous est attribuée.</p> : <div className="space-y-4">{deliveries.map(delivery => {
         const action = nextStatus[delivery.status ?? ""];
         return <div key={delivery.id} className={`space-y-2 rounded-lg border p-4 ${["pending", "assigned"].includes(delivery.status ?? "") ? "border-amber-500/50 bg-amber-500/5" : ""}`}><div className="flex items-center gap-2"><PackageCheck className="h-5 w-5 text-primary" /><p className="font-bold">Livraison #{delivery.id}</p></div><p>Commande : {delivery.order_id || "—"}</p><p>Statut : {statusLabels[delivery.status ?? ""] || delivery.status || "En attente"}</p><p>Frais : {Number(delivery.delivery_fee || 0).toLocaleString("fr-FR")} FCFA</p>{action && <button disabled={saving != null} onClick={() => void updateStatus(delivery, action.status)} className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50 sm:w-auto">{saving === delivery.id ? "Enregistrement…" : action.label}</button>}</div>;
       })}</div>}
